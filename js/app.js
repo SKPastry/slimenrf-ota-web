@@ -837,11 +837,23 @@ Alpine.data('otaApp', () => ({
   _autoMapFirmware() {
     const newMapping = {};
     const allTargets = this.allBoardTargets;
+    const rcvTarget = this.receiverBoardTarget;
+    const trackerTargets = allTargets.filter(bt => bt !== rcvTarget);
 
     if (this.firmwareFiles.length === 1) {
-      // Single firmware → map to all known board targets
-      for (const bt of allTargets) {
-        newMapping[bt] = this.firmwareFiles[0].id;
+      const fw = this.firmwareFiles[0];
+      const isReceiverFw = fw.detectedBoard && matchReceiverBoardTarget(fw.file?.name ?? '');
+      const isTrackerFw = fw.detectedBoard && matchBoardTarget(fw.file?.name ?? '');
+
+      if (isReceiverFw) {
+        // Receiver firmware → map only to receiver target
+        if (rcvTarget) newMapping[rcvTarget] = fw.id;
+      } else if (isTrackerFw) {
+        // Tracker firmware → map only to tracker targets
+        for (const bt of trackerTargets) newMapping[bt] = fw.id;
+      } else {
+        // Unknown firmware → map to all tracker targets (not receiver)
+        for (const bt of trackerTargets) newMapping[bt] = fw.id;
       }
     } else if (this.firmwareFiles.length > 1) {
       // Multiple firmwares → use detected board targets
