@@ -1514,6 +1514,7 @@ Alpine.data('otaApp', () => ({
 
 // ── Register Serial DFU component ─────────────────────────────────
 import './serial-dfu-ui.js';
+import './i18n.js';
 
 // ── Shared Firmware Store ───────────────────────────────────────────
 // Bridges the main OTA app's firmware list to the Serial DFU component

@@ -29,9 +29,13 @@
         <svg class="w-7 h-7 text-primary shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
         </svg>
-        <span class="text-lg font-bold tracking-tight leading-none">SlimeNRF OTA Updater</span>
+        <span class="text-lg font-bold tracking-tight leading-none" x-text="$t('title')"></span>
       </div>
-      <div class="flex-none gap-2">
+      <div class="flex-none gap-2 flex items-center">
+        <!-- Language switcher -->
+        <button class="btn btn-ghost btn-sm font-medium text-xs px-2"
+                @click="$store.i18n.nextLocale()"
+                x-text="$store.i18n.localeNames[$store.i18n.locale]"></button>
         <!-- Theme toggle -->
         <label class="swap swap-rotate btn btn-ghost btn-circle btn-sm">
           <input type="checkbox" :checked="theme === 'light'" @change="toggleTheme()">
@@ -52,8 +56,8 @@
       <div class="alert alert-warning shadow-lg">
         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         <div>
-          <p class="font-semibold">WebHID not supported</p>
-          <p class="text-sm">Please use <b>Chrome</b>, <b>Edge</b>, or <b>Opera</b> to access WebHID.</p>
+          <p class="font-semibold" x-text="$t('webhid.notSupported')"></p>
+          <p class="text-sm" x-html="$t('webhid.useChrome', { chrome: '<b>Chrome</b>', edge: '<b>Edge</b>', opera: '<b>Opera</b>' })"></p>
         </div>
       </div>
     </template>
@@ -64,7 +68,7 @@
         <div class="flex flex-wrap items-center justify-between gap-2">
           <h2 class="card-title text-base">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            Connection
+            <span x-text="$t('conn.title')"></span>
           </h2>
           <div class="flex flex-wrap items-center gap-2">
             <template x-if="connected">
@@ -75,10 +79,9 @@
                 </div>
                 <button class="btn btn-ghost btn-sm" @click="scan()" :disabled="scanning || updating">
                   <span class="loading loading-spinner loading-xs" x-show="scanning"></span>
-                  Rescan
+                  <span x-text="$t('conn.rescan')"></span>
                 </button>
-                <button class="btn btn-ghost btn-sm text-error" @click="disconnect()" :disabled="updating">
-                  Disconnect
+                <button class="btn btn-ghost btn-sm text-error" @click="disconnect()" :disabled="updating" x-text="$t('conn.disconnect')">
                 </button>
               </div>
             </template>
@@ -87,7 +90,7 @@
                 <span class="loading loading-spinner loading-xs" x-show="connecting"></span>
                 <button class="btn btn-primary btn-sm" @click="addDevice()" :disabled="connecting">
                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                  Add Device
+                  <span x-text="$t('conn.addDevice')"></span>
                 </button>
               </div>
             </template>
@@ -97,14 +100,14 @@
         <!-- Paired devices list (when not connected) -->
         <template x-if="!connected && pairedDevices.length > 0">
           <div class="mt-2 space-y-1">
-            <div class="text-xs text-base-content/60 mb-1">Previously paired devices:</div>
+            <div class="text-xs text-base-content/60 mb-1" x-text="$t('conn.pairedDevices')"></div>
             <template x-for="(dev, idx) in pairedDevices" :key="idx">
               <button class="btn btn-ghost btn-sm w-full justify-start gap-2 font-normal"
                       @click="connectDevice(dev)" :disabled="connecting">
                 <svg class="w-4 h-4 text-base-content/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                 <span class="truncate" x-text="deviceLabel(dev)"></span>
                 <template x-if="getReceiverCache(dev)">
-                  <span class="badge badge-ghost badge-xs shrink-0" x-text="`${getReceiverCache(dev).trackerCount} trackers`"></span>
+                  <span class="badge badge-ghost badge-xs shrink-0" x-text="getReceiverCache(dev).trackerCount + ' ' + $t('conn.trackers')"></span>
                 </template>
               </button>
             </template>
@@ -115,7 +118,7 @@
         <template x-if="connected && pairedDevices.length > 1">
           <div class="mt-2">
             <details class="collapse collapse-arrow bg-base-200/50 rounded-lg">
-              <summary class="collapse-title text-xs min-h-0 py-1 px-3">Switch receiver (<span x-text="pairedDevices.length"></span> paired)</summary>
+              <summary class="collapse-title text-xs min-h-0 py-1 px-3" x-text="$t('conn.switchReceiver', { count: pairedDevices.length })"></summary>
               <div class="collapse-content px-3 pb-2 space-y-1">
                 <template x-for="(dev, idx) in pairedDevices" :key="idx">
                   <button class="btn btn-ghost btn-xs w-full justify-start gap-2 font-normal"
@@ -123,7 +126,7 @@
                           :class="{ 'btn-active': selectedDevice === dev }">
                     <span class="truncate" x-text="deviceLabel(dev)"></span>
                     <template x-if="getReceiverCache(dev)">
-                      <span class="badge badge-ghost badge-xs shrink-0" x-text="`${getReceiverCache(dev).trackerCount} trackers`"></span>
+                    <span class="badge badge-ghost badge-xs shrink-0" x-text="getReceiverCache(dev).trackerCount + ' ' + $t('conn.trackers')"></span>
                     </template>
                   </button>
                 </template>
@@ -138,7 +141,7 @@
     <div class="alert alert-info shadow-sm text-sm" x-show="!otaNoticeHidden">
       <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       <div>
-        <p>OTA requires firmware <a href="https://github.com/jitingcn/SlimeVR-Tracker-nRF/releases/tag/260527" target="_blank" class="link font-semibold">260527</a> or later on <b>both</b> the receiver and trackers. Please flash via USB/UF2 first if needed.</p>
+        <p x-html="$t('notice.otaRequires', { link: '<a href=\'https://github.com/jitingcn/SlimeVR-Tracker-nRF/releases/tag/260527\' target=\'_blank\' class=\'link font-semibold\'>260527</a>', both: '<b>' + $t('notice.both') + '</b>' })"></p>
       </div>
       <button class="btn btn-ghost btn-xs btn-circle shrink-0" @click="otaNoticeHidden = true" title="Dismiss">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -152,7 +155,7 @@
           <!-- Receiver label -->
           <div class="flex items-center gap-2 shrink-0">
             <svg class="w-5 h-5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"/></svg>
-            <span class="font-semibold text-sm">Receiver</span>
+            <span class="font-semibold text-sm" x-text="$t('receiver.title')"></span>
           </div>
 
           <!-- Info chips (shown when queried, with or without self-OTA support) -->
@@ -165,7 +168,7 @@
               <template x-if="receiverInfo.protocolVersion === 0">
                 <span class="badge badge-warning badge-xs gap-0.5">
                   <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  Self-OTA unsupported
+                  <span x-text="$t('receiver.selfOtaUnsupported')"></span>
                 </span>
               </template>
             </div>
@@ -176,22 +179,22 @@
             <span class="flex items-center gap-1.5 flex-1">
               <span class="badge badge-warning badge-xs gap-0.5">
                 <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                OTA unsupported
+                <span x-text="$t('receiver.otaUnsupported')"></span>
               </span>
-              <span class="text-[10px] opacity-40">Flash receiver via UF2/DFU first</span>
+              <span class="text-[10px] opacity-40" x-text="$t('receiver.flashFirst')"></span>
             </span>
           </template>
 
           <!-- Querying spinner -->
           <template x-if="queryingReceiver">
             <span class="flex items-center gap-1.5 text-xs opacity-60 flex-1">
-              <span class="loading loading-spinner loading-xs"></span> Querying…
+              <span class="loading loading-spinner loading-xs"></span> <span x-text="$t('receiver.querying')"></span>
             </span>
           </template>
 
           <!-- Not yet queried (should auto-query, but show as fallback) -->
           <template x-if="!receiverInfo && !receiverInfoQueried && !queryingReceiver">
-            <span class="text-xs opacity-40 flex-1">Querying…</span>
+            <span class="text-xs opacity-40 flex-1" x-text="$t('receiver.querying')"></span>
           </template>
 
           <!-- Actions -->
@@ -200,18 +203,18 @@
             <template x-if="receiverInfo && receiverInfo.bootloader === 'nrf5_opendfu'">
               <button class="btn btn-ghost btn-xs gap-1 text-warning"
                       :disabled="enteringDfu"
-                      title="Send DFU command via serial to enter bootloader mode"
+                      :title="$t('receiver.enterDfuTitle')"
                       @click="enterReceiverDfu()">
                 <span class="loading loading-spinner loading-xs" x-show="enteringDfu"></span>
                 <svg x-show="!enteringDfu" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                Enter DFU
+                <span x-text="$t('receiver.enterDfu')"></span>
               </button>
             </template>
             <button class="btn btn-ghost btn-xs gap-1"
                     :disabled="queryingReceiver || receiverUpdating"
                     @click="queryReceiverInfo()">
               <svg class="w-3.5 h-3.5" x-show="!queryingReceiver" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-              Refresh
+              <span x-text="$t('receiver.refresh')"></span>
             </button>
           </div>
         </div>
@@ -223,12 +226,12 @@
         <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
           <h2 class="card-title text-base">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-            Trackers
-            <span class="badge badge-neutral badge-sm" x-text="onlineTrackerIds.length + ' online'"></span>
+            <span x-text="$t('tracker.title')"></span>
+            <span class="badge badge-neutral badge-sm" x-text="onlineTrackerIds.length + ' ' + $t('tracker.online')"></span>
           </h2>
           <div class="flex gap-2" x-show="!updating">
-            <button class="btn btn-ghost btn-xs" @click="selectAllOnline()">Select All</button>
-            <button class="btn btn-ghost btn-xs" @click="deselectAll()">Deselect</button>
+            <button class="btn btn-ghost btn-xs" @click="selectAllOnline()" x-text="$t('tracker.selectAll')"></button>
+            <button class="btn btn-ghost btn-xs" @click="deselectAll()" x-text="$t('tracker.deselect')"></button>
           </div>
         </div>
 
@@ -272,13 +275,13 @@
                       <button class="btn btn-ghost btn-circle btn-xs opacity-40 hover:opacity-100"
                               x-show="!updating && !queryingTrackers[tid]"
                               @click.stop="refreshTracker(tid)"
-                              title="Refresh info">
+                              :title="$t('tracker.refreshInfo')">
                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                       </button>
                     </div>
                     <span class="badge badge-xs"
                           :class="trackers[tid]?.online ? 'badge-success' : 'badge-ghost'"
-                          x-text="trackers[tid]?.online ? 'online' : 'offline'"></span>
+                          x-text="trackers[tid]?.online ? $t('tracker.online') : $t('tracker.offline')"></span>
                   </div>
                 </div>
 
@@ -304,9 +307,9 @@
                   <div class="mt-1">
                     <span class="badge badge-warning badge-xs gap-1">
                       <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                      OTA Unsupported
+                      <span x-text="$t('tracker.otaUnsupported')"></span>
                     </span>
-                    <p class="text-[10px] opacity-40 mt-0.5">Flash via UF2/DFU first</p>
+                    <p class="text-[10px] opacity-40 mt-0.5" x-text="$t('tracker.flashFirst')"></p>
                   </div>
                 </template>
 
@@ -330,7 +333,7 @@
         <!-- Scanning indicator -->
         <div class="flex items-center justify-center gap-2 py-4" x-show="scanning">
           <span class="loading loading-dots loading-sm text-primary"></span>
-          <span class="text-sm opacity-60">Scanning for trackers…</span>
+          <span class="text-sm opacity-60" x-text="$t('tracker.scanning')"></span>
         </div>
       </div>
     </div>
@@ -342,7 +345,7 @@
                 @click="ghToggle()">
           <h2 class="card-title text-base">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/></svg>
-            Download Firmwares from GitHub
+            <span x-text="$t('gh.title')"></span>
           </h2>
           <svg class="w-4 h-4 transition-transform" :class="ghExpanded ? 'rotate-180' : ''"
                fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -356,14 +359,14 @@
           <div class="flex items-center gap-2">
             <div role="tablist" class="tabs tabs-border flex-1">
               <a role="tab" class="tab" :class="ghTab === 'releases' ? 'tab-active' : ''"
-                 @click="ghSwitchTab('releases')">Releases</a>
+                 @click="ghSwitchTab('releases')" x-text="$t('gh.releases')"></a>
               <a role="tab" class="tab" :class="ghTab === 'ci' ? 'tab-active' : ''"
-                 @click="ghSwitchTab('ci')">Tracker CI</a>
+                 @click="ghSwitchTab('ci')" x-text="$t('gh.trackerCi')"></a>
               <a role="tab" class="tab" :class="ghTab === 'receiver-ci' ? 'tab-active' : ''"
-                 @click="ghSwitchTab('receiver-ci')">Receiver CI</a>
+                 @click="ghSwitchTab('receiver-ci')" x-text="$t('gh.receiverCi')"></a>
             </div>
             <label class="flex items-center gap-1.5 cursor-pointer shrink-0" x-show="ghDetectedTargets.length > 0 || receiverBoardTarget">
-              <span class="text-xs opacity-60">Only Matched</span>
+              <span class="text-xs opacity-60" x-text="$t('gh.onlyMatched')"></span>
               <input type="checkbox" class="toggle toggle-xs toggle-primary" x-model="ghFilterByTarget">
             </label>
           </div>
@@ -391,14 +394,14 @@
 
                   <!-- Tracker / Receiver filter -->
                   <div class="flex items-center gap-1.5 mt-2">
-                    <span class="text-xs opacity-50">Show:</span>
+                    <span class="text-xs opacity-50" x-text="$t('gh.show')"></span>
                     <div class="join">
                       <button class="join-item btn btn-xs" :class="ghReleaseFilter === 'tracker' ? 'btn-primary' : 'btn-ghost'"
-                              @click="ghReleaseFilter = 'tracker'">Tracker</button>
+                              @click="ghReleaseFilter = 'tracker'" x-text="$t('gh.tracker')"></button>
                       <button class="join-item btn btn-xs" :class="ghReleaseFilter === 'receiver' ? 'btn-primary' : 'btn-ghost'"
-                              @click="ghReleaseFilter = 'receiver'">Receiver</button>
+                              @click="ghReleaseFilter = 'receiver'" x-text="$t('gh.receiver')"></button>
                       <button class="join-item btn btn-xs" :class="ghReleaseFilter === 'all' ? 'btn-primary' : 'btn-ghost'"
-                              @click="ghReleaseFilter = 'all'">All</button>
+                              @click="ghReleaseFilter = 'all'" x-text="$t('gh.all')"></button>
                     </div>
                   </div>
 
@@ -406,9 +409,9 @@
                   <template x-if="ghCurrentRelease">
                     <div class="mt-2 space-y-1">
                       <div class="text-xs opacity-50 mb-1.5">
-                        <span x-text="ghFilteredReleaseAssets.length + '/' + ghCurrentRelease.assets.filter(a => ghReleaseFilter === 'all' || a.type === ghReleaseFilter).length"></span> firmware(s) shown
+                        <span x-text="ghFilteredReleaseAssets.length + '/' + ghCurrentRelease.assets.filter(a => ghReleaseFilter === 'all' || a.type === ghReleaseFilter).length"></span> <span x-text="$t('gh.firmwaresShown')"></span>
                         <span class="text-warning ml-1" x-show="!isTauri && !ghProxyAvailable"
-                              title="Release downloads open in a new tab — drag and drop the .uf2 file to load">· Opens in new tab</span>
+                              title="Release downloads open in a new tab — drag and drop the .uf2 file to load" x-text="'· ' + $t('gh.releasesOpensInTab')"></span>
                       </div>
                       <div class="max-h-64 overflow-y-auto space-y-1 pr-0.5">
                         <template x-for="asset in ghFilteredReleaseAssets" :key="asset.name">
@@ -430,11 +433,11 @@
                             <template x-if="ghDlState(asset.name)?.done">
                               <span class="badge badge-success badge-sm gap-1">
                                 <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Loaded
+                                <span x-text="$t('gh.loaded')"></span>
                               </span>
                             </template>
                             <template x-if="ghDlState(asset.name)?.fallback">
-                              <span class="badge badge-warning badge-sm">Opened in tab</span>
+                              <span class="badge badge-warning badge-sm" x-text="$t('gh.openedInTab')"></span>
                             </template>
                             <template x-if="ghIsDownloading(asset.name)">
                               <span class="loading loading-spinner loading-xs"></span>
@@ -443,15 +446,15 @@
                               <div class="flex items-center gap-2">
                                 <button class="btn btn-ghost btn-xs btn-square opacity-40 hover:opacity-100"
                                         @click="ghSaveReleaseToDisk(asset)"
-                                        title="Save to disk">
+                                        :title="$t('gh.saveToDisk')">
                                   <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                 </button>
                                 <button class="btn btn-primary btn-sm gap-1 px-3"
                                         @click="ghDownloadRelease(asset)"
                                         :disabled="ghIsDownloading(asset.name)"
-                                        title="Download and load into updater">
+                                        :title="$t('gh.downloadAndLoad')">
                                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                                  Load
+                                  <span x-text="$t('gh.loadFirmware')"></span>
                                 </button>
                               </div>
                             </template>
@@ -464,7 +467,7 @@
               </template>
 
               <template x-if="ghReleases.length === 0 && !ghLoading">
-                <div class="text-center text-sm opacity-50 py-4">No releases found</div>
+                <div class="text-center text-sm opacity-50 py-4" x-text="$t('gh.noReleases')"></div>
               </template>
             </div>
           </template>
@@ -478,7 +481,7 @@
                   <select class="select select-bordered select-sm w-full"
                           :value="ghSelectedRun || ''"
                           @change="ghSelectRun(Number($event.target.value))">
-                    <option value="" disabled>— Select a CI build —</option>
+                    <option value="" disabled x-text="$t('gh.selectCiBuild')"></option>
                     <template x-for="run in ghCIRuns" :key="run.id">
                       <option :value="run.id"
                               x-text="'#' + run.number + ' · ' + run.sha + ' · ' + run.title.slice(0, 50) + ' · ' + formatDate(run.date)"
@@ -489,15 +492,15 @@
                   <!-- Artifact loading -->
                   <div x-show="ghArtifactsLoading" class="flex items-center justify-center py-3">
                     <span class="loading loading-spinner loading-sm text-primary"></span>
-                    <span class="text-sm ml-2 opacity-60">Loading artifacts…</span>
+                    <span class="text-sm ml-2 opacity-60" x-text="$t('gh.loadingArtifacts')"></span>
                   </div>
 
                   <!-- Artifact list -->
                   <template x-if="ghSelectedRun && ghRunArtifacts.length > 0 && !ghArtifactsLoading">
                     <div class="mt-2 space-y-1">
                       <div class="text-xs opacity-50 mb-1.5">
-                        <span x-text="ghFilteredArtifacts.length + '/' + ghRunArtifacts.length"></span> artifact(s) shown
-                        <span class="text-warning ml-1" x-show="!isTauri && !ghProxyAvailable">· Opens in new tab (drop .zip to load)</span>
+                        <span x-text="ghFilteredArtifacts.length + '/' + ghRunArtifacts.length"></span> <span x-text="$t('gh.artifactsShown')"></span>
+                        <span class="text-warning ml-1" x-show="!isTauri && !ghProxyAvailable" x-text="'· ' + $t('gh.opensInTab')"></span>
                       </div>
                       <div class="max-h-64 overflow-y-auto space-y-1 pr-0.5">
                         <template x-for="artifact in ghFilteredArtifacts" :key="artifact.name">
@@ -519,11 +522,11 @@
                             <template x-if="ghDlState(artifact.name)?.done">
                               <span class="badge badge-success badge-sm gap-1">
                                 <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Loaded
+                                <span x-text="$t('gh.loaded')"></span>
                               </span>
                             </template>
                             <template x-if="ghDlState(artifact.name)?.fallback">
-                              <span class="badge badge-warning badge-sm">Opened in tab</span>
+                              <span class="badge badge-warning badge-sm" x-text="$t('gh.openedInTab')"></span>
                             </template>
                             <template x-if="ghIsDownloading(artifact.name)">
                               <div class="flex items-center gap-1.5">
@@ -533,22 +536,22 @@
                             </template>
                             <template x-if="ghDlState(artifact.name)?.error">
                               <div class="flex items-center gap-1">
-                                <span class="badge badge-error badge-sm">Error</span>
-                                <button class="btn btn-ghost btn-xs" @click="ghDownloadArtifact(artifact)">Retry</button>
+                                <span class="badge badge-error badge-sm" x-text="$t('gh.error')"></span>
+                                <button class="btn btn-ghost btn-xs" @click="ghDownloadArtifact(artifact)" x-text="$t('gh.retry')"></button>
                               </div>
                             </template>
                             <template x-if="!ghDlState(artifact.name)">
                               <div class="flex items-center gap-2">
                                 <button class="btn btn-ghost btn-xs btn-square opacity-40 hover:opacity-100"
                                         @click="ghSaveArtifactToDisk(artifact)"
-                                        title="Save to disk">
+                                        :title="$t('gh.saveToDisk')">
                                   <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                 </button>
                                 <button class="btn btn-primary btn-sm gap-1 px-3"
                                         @click="ghDownloadArtifact(artifact)"
-                                        title="Download and load into updater">
+                                        :title="$t('gh.downloadAndLoad')">
                                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                                  Load
+                                  <span x-text="$t('gh.loadFirmware')"></span>
                                 </button>
                               </div>
                             </template>
@@ -559,13 +562,13 @@
                   </template>
 
                   <template x-if="ghSelectedRun && ghRunArtifacts.length === 0 && !ghArtifactsLoading">
-                    <div class="text-center text-sm opacity-50 py-3">No artifacts found for this run</div>
+                    <div class="text-center text-sm opacity-50 py-3" x-text="$t('gh.noArtifacts')"></div>
                   </template>
                 </div>
               </template>
 
               <template x-if="ghCIRuns.length === 0 && !ghLoading">
-                <div class="text-center text-sm opacity-50 py-4">No tracker CI builds found</div>
+                <div class="text-center text-sm opacity-50 py-4" x-text="$t('gh.noCiBuilds')"></div>
               </template>
             </div>
           </template>
@@ -579,7 +582,7 @@
                   <select class="select select-bordered select-sm w-full"
                           :value="ghSelectedReceiverRun || ''"
                           @change="ghSelectReceiverRun(Number($event.target.value))">
-                    <option value="" disabled>— Select a receiver CI build —</option>
+                    <option value="" disabled x-text="$t('gh.selectReceiverCiBuild')"></option>
                     <template x-for="run in ghReceiverCIRuns" :key="run.id">
                       <option :value="run.id"
                               x-text="'#' + run.number + ' · ' + run.sha + ' · ' + run.title.slice(0, 50) + ' · ' + formatDate(run.date)"
@@ -590,15 +593,15 @@
                   <!-- Artifact loading -->
                   <div x-show="ghArtifactsLoading" class="flex items-center justify-center py-3">
                     <span class="loading loading-spinner loading-sm text-primary"></span>
-                    <span class="text-sm ml-2 opacity-60">Loading artifacts…</span>
+                    <span class="text-sm ml-2 opacity-60" x-text="$t('gh.loadingArtifacts')"></span>
                   </div>
 
                   <!-- Artifact list -->
                   <template x-if="ghSelectedReceiverRun && ghReceiverRunArtifacts.length > 0 && !ghArtifactsLoading">
                     <div class="mt-2 space-y-1">
                       <div class="text-xs opacity-50 mb-1.5">
-                        <span x-text="ghFilteredReceiverArtifacts.length + '/' + ghReceiverRunArtifacts.length"></span> artifact(s) shown
-                        <span class="text-warning ml-1" x-show="!isTauri && !ghProxyAvailable">· Opens in new tab (drop .zip to load)</span>
+                        <span x-text="ghFilteredReceiverArtifacts.length + '/' + ghReceiverRunArtifacts.length"></span> <span x-text="$t('gh.artifactsShown')"></span>
+                        <span class="text-warning ml-1" x-show="!isTauri && !ghProxyAvailable" x-text="'· ' + $t('gh.opensInTab')"></span>
                       </div>
                       <div class="max-h-64 overflow-y-auto space-y-1 pr-0.5">
                         <template x-for="artifact in ghFilteredReceiverArtifacts" :key="artifact.name">
@@ -620,11 +623,11 @@
                             <template x-if="ghDlState(artifact.name)?.done">
                               <span class="badge badge-success badge-sm gap-1">
                                 <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Loaded
+                                <span x-text="$t('gh.loaded')"></span>
                               </span>
                             </template>
                             <template x-if="ghDlState(artifact.name)?.fallback">
-                              <span class="badge badge-warning badge-sm">Opened in tab</span>
+                              <span class="badge badge-warning badge-sm" x-text="$t('gh.openedInTab')"></span>
                             </template>
                             <template x-if="ghIsDownloading(artifact.name)">
                               <div class="flex items-center gap-1.5">
@@ -634,22 +637,22 @@
                             </template>
                             <template x-if="ghDlState(artifact.name)?.error">
                               <div class="flex items-center gap-1">
-                                <span class="badge badge-error badge-sm">Error</span>
-                                <button class="btn btn-ghost btn-xs" @click="ghDownloadArtifact(artifact)">Retry</button>
+                                <span class="badge badge-error badge-sm" x-text="$t('gh.error')"></span>
+                                <button class="btn btn-ghost btn-xs" @click="ghDownloadArtifact(artifact)" x-text="$t('gh.retry')"></button>
                               </div>
                             </template>
                             <template x-if="!ghDlState(artifact.name)">
                               <div class="flex items-center gap-2">
                                 <button class="btn btn-ghost btn-xs btn-square opacity-40 hover:opacity-100"
                                         @click="ghSaveArtifactToDisk(artifact)"
-                                        title="Save to disk">
+                                        :title="$t('gh.saveToDisk')">
                                   <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                 </button>
                                 <button class="btn btn-primary btn-sm gap-1 px-3"
                                         @click="ghDownloadArtifact(artifact)"
-                                        title="Download and load into updater">
+                                        :title="$t('gh.downloadAndLoad')">
                                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                                  Load
+                                  <span x-text="$t('gh.loadFirmware')"></span>
                                 </button>
                               </div>
                             </template>
@@ -660,13 +663,13 @@
                   </template>
 
                   <template x-if="ghSelectedReceiverRun && ghReceiverRunArtifacts.length === 0 && !ghArtifactsLoading">
-                    <div class="text-center text-sm opacity-50 py-3">No artifacts found for this run</div>
+                    <div class="text-center text-sm opacity-50 py-3" x-text="$t('gh.noArtifacts')"></div>
                   </template>
                 </div>
               </template>
 
               <template x-if="ghReceiverCIRuns.length === 0 && !ghLoading">
-                <div class="text-center text-sm opacity-50 py-4">No receiver CI builds found</div>
+                <div class="text-center text-sm opacity-50 py-4" x-text="$t('gh.noReceiverCiBuilds')"></div>
               </template>
             </div>
           </template>
@@ -680,8 +683,8 @@
       <div class="card-body p-4">
         <h2 class="card-title text-base mb-2">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          Firmware
-          <span class="badge badge-ghost badge-sm" x-show="firmwareFiles.length > 0" x-text="firmwareFiles.length + ' file(s)'"></span>
+          <span x-text="$t('fw.title')"></span>
+          <span class="badge badge-ghost badge-sm" x-show="firmwareFiles.length > 0" x-text="firmwareFiles.length + ' ' + $t('fw.files')"></span>
         </h2>
 
         <!-- Drop zone -->
@@ -698,7 +701,7 @@
             <div>
               <svg class="w-10 h-10 mx-auto mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
               <p class="text-sm opacity-60 mb-2">Drag & drop <b>.uf2</b>, <b>.hex</b>, or <b>.zip</b> firmware file(s) here</p>
-              <button class="btn btn-primary btn-sm" @click="$refs.fileInput.click()">Choose Files</button>
+              <button class="btn btn-primary btn-sm" @click="$refs.fileInput.click()" x-text="$t('fw.chooseFiles')"></button>
             </div>
           </template>
 
@@ -723,17 +726,17 @@
                   </div>
                   <div class="flex items-center gap-0.5 shrink-0">
                     <button class="btn btn-ghost btn-xs btn-circle opacity-40 hover:opacity-100"
-                            @click="saveFirmware(fw)" title="Save to disk">
+                            @click="saveFirmware(fw)" :title="$t('fw.saveToDisk')">
                       <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                     </button>
                     <button class="btn btn-ghost btn-xs btn-circle opacity-40 hover:opacity-100"
-                            @click="removeFirmware(fw.id)" title="Remove">
+                            @click="removeFirmware(fw.id)" :title="$t('fw.remove')">
                       <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                   </div>
                 </div>
               </template>
-              <button class="btn btn-ghost btn-xs" @click="$refs.fileInput.click()">+ Add More</button>
+              <button class="btn btn-ghost btn-xs" @click="$refs.fileInput.click()" x-text="$t('fw.addMore')"></button>
             </div>
           </template>
         </div>
@@ -742,9 +745,9 @@
         <template x-if="showMapping">
           <div class="mt-3">
             <div class="flex items-center justify-between mb-2">
-              <h3 class="text-sm font-medium opacity-70">Board Target Mapping</h3>
+              <h3 class="text-sm font-medium opacity-70" x-text="$t('fw.boardTargetMapping')"></h3>
               <span class="badge badge-xs" :class="allMapped ? 'badge-success' : 'badge-warning'"
-                    x-text="allMapped ? 'All mapped' : 'Unmapped targets'"></span>
+                    x-text="allMapped ? $t('fw.allMapped') : $t('fw.unmappedTargets')"></span>
             </div>
             <div class="space-y-1.5">
               <template x-for="bt in allBoardTargets" :key="bt">
@@ -760,7 +763,7 @@
                   <select class="select select-bordered select-xs min-w-0 flex-1"
                           :value="firmwareMapping[bt] || ''"
                           @change="setFirmwareMapping(bt, Number($event.target.value) || null)">
-                    <option value="">— Select firmware —</option>
+                    <option value="" x-text="$t('fw.selectFirmware')"></option>
                     <template x-for="fw in firmwareFiles" :key="fw.id">
                       <option :value="fw.id" x-text="fw.file.name" :selected="firmwareMapping[bt] === fw.id"></option>
                     </template>
@@ -778,40 +781,40 @@
       <div class="card-body p-4">
         <h2 class="card-title text-base mb-2">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          Update
+          <span x-text="$t('update.title')"></span>
         </h2>
 
         <!-- Pre-update: start button -->
         <template x-if="!updating && updateSuccess === null">
           <div class="flex flex-col items-center gap-3">
             <div class="text-sm opacity-60" x-show="selectedCount > 0 || _hasReceiverUpdate()">
-              <span x-show="selectedCount > 0" x-text="selectedCount + ' tracker(s) selected'"></span>
+              <span x-show="selectedCount > 0" x-text="selectedCount + ' ' + $t('update.trackersSelected')"></span>
               <span x-show="selectedCount > 0 && _hasReceiverUpdate()"> + </span>
               <span x-show="_hasReceiverUpdate()">receiver</span>
             </div>
             <template x-if="selectedCount > 0 && _hasReceiverUpdate()">
               <div class="alert alert-info alert-sm py-1 px-3">
                 <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span class="text-xs">Trackers will be updated first, then the receiver.</span>
+                <span class="text-xs" x-text="$t('update.trackersFirstThenReceiver')"></span>
               </div>
             </template>
             <template x-if="receiverInfo && (receiverInfo.protocolVersion === 0 || receiverInfo.bootloader === 'nrf5_opendfu') && receiverInfo.boardTarget && firmwareMapping[receiverInfo.boardTarget]">
               <div class="alert alert-warning alert-sm py-1 px-3">
                 <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span class="text-xs" x-text="receiverInfo.bootloader === 'nrf5_opendfu'
-                  ? 'Receiver has nRF5 OpenDFU bootloader — self-OTA blocked by ACL flash protection. Use Serial DFU below or SWD.'
-                  : 'Receiver firmware mapped but self-OTA unsupported — update receiver via UF2/DFU.'"></span>
+                  ? $t('update.receiverAclBlocked')
+                  : $t('update.receiverUnsupported')"></span>
               </div>
             </template>
             <button class="btn btn-primary gap-2"
                     :disabled="!canUpdate"
                     @click="startUpdate()">
               <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-              Start Update
+              <span x-text="$t('update.startUpdate')"></span>
             </button>
-            <p class="text-xs opacity-40" x-show="!canUpdate && firmwareFiles.length === 0">Select a firmware file first</p>
-            <p class="text-xs opacity-40" x-show="!canUpdate && firmwareFiles.length > 0 && selectedCount === 0 && !_hasReceiverUpdate()">Select trackers to update or load receiver firmware</p>
-            <p class="text-xs opacity-40" x-show="!canUpdate && firmwareFiles.length > 0 && selectedCount > 0 && !allMapped">Map firmware to all board targets</p>
+            <p class="text-xs opacity-40" x-show="!canUpdate && firmwareFiles.length === 0" x-text="$t('update.selectFirmwareFirst')"></p>
+            <p class="text-xs opacity-40" x-show="!canUpdate && firmwareFiles.length > 0 && selectedCount === 0 && !_hasReceiverUpdate()" x-text="$t('update.selectTrackersOrReceiver')"></p>
+            <p class="text-xs opacity-40" x-show="!canUpdate && firmwareFiles.length > 0 && selectedCount > 0 && !allMapped" x-text="$t('update.mapAllTargets')"></p>
           </div>
         </template>
 
@@ -829,8 +832,8 @@
             <!-- Batch info -->
             <div class="text-center text-sm" x-show="batchInfo.total > 1">
               <span class="badge badge-outline badge-sm">
-                Batch <span x-text="batchInfo.current"></span>/<span x-text="batchInfo.total"></span>
-                — Trackers <span x-text="batchInfo.trackerIds?.join(', ')"></span>
+                <span x-text="$t('update.batch')"></span> <span x-text="batchInfo.current"></span>/<span x-text="batchInfo.total"></span>
+                — <span x-text="$t('tracker.title')"></span> <span x-text="batchInfo.trackerIds?.join(', ')"></span>
               </span>
             </div>
 
@@ -854,8 +857,7 @@
 
             <!-- Abort button -->
             <div class="text-center">
-              <button class="btn btn-error btn-sm btn-outline" @click="abortUpdate()">
-                Abort Update
+              <button class="btn btn-error btn-sm btn-outline" @click="abortUpdate()" x-text="$t('update.abortUpdate')">
               </button>
             </div>
           </div>
@@ -869,24 +871,22 @@
                    x-data="{ countdown: 8 }"
                    x-init="let t = setInterval(() => { countdown--; if (countdown <= 0) clearInterval(t); }, 1000)">
                 <svg class="w-12 h-12 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <p class="text-lg font-semibold text-success">Update Successful!</p>
-                <p class="text-sm opacity-60">All trackers have been updated and rebooted.</p>
-                <p class="text-xs opacity-40">Auto-dismissing in <span x-text="Math.max(countdown, 0)"></span>s…</p>
+                <p class="text-lg font-semibold text-success" x-text="$t('update.updateSuccessful')"></p>
+                <p class="text-sm opacity-60" x-text="$t('update.allUpdated')"></p>
+                <p class="text-xs opacity-40" x-text="$t('update.autoDismiss', { seconds: Math.max(countdown, 0) })"></p>
               </div>
             </template>
             <template x-if="!updateSuccess">
               <div class="flex flex-col items-center gap-2">
                 <svg class="w-12 h-12 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <p class="text-lg font-semibold text-error">Update Failed</p>
-                <p class="text-sm opacity-60">Check the log for details. Failed trackers will reboot to bootloader.</p>
+                <p class="text-lg font-semibold text-error" x-text="$t('update.updateFailed')"></p>
+                <p class="text-sm opacity-60" x-text="$t('update.checkLog')"></p>
               </div>
             </template>
             <div class="flex gap-2 justify-center">
-              <button class="btn btn-primary btn-sm" @click="updateSuccess = null; scan()">
-                Scan Again
+              <button class="btn btn-primary btn-sm" @click="updateSuccess = null; scan()" x-text="$t('update.scanAgain')">
               </button>
-              <button class="btn btn-ghost btn-sm" @click="updateSuccess = null">
-                Dismiss
+              <button class="btn btn-ghost btn-sm" @click="updateSuccess = null" x-text="$t('update.dismiss')">
               </button>
             </div>
           </div>
@@ -900,20 +900,20 @@
         <div class="flex items-center justify-between">
           <h2 class="card-title text-base">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            Serial DFU
-            <span class="badge badge-outline badge-xs">USB</span>
+            <span x-text="$t('dfu.title')"></span>
+            <span class="badge badge-outline badge-xs" x-text="$t('dfu.usb')"></span>
           </h2>
           <template x-if="!webSerialSupported">
-            <span class="badge badge-warning badge-sm">Web Serial not supported</span>
+            <span class="badge badge-warning badge-sm" x-text="$t('dfu.webSerialNotSupported')"></span>
           </template>
         </div>
-        <p class="text-xs opacity-60 -mt-1">Flash firmware directly via USB serial — device must be in DFU/bootloader mode (double-tap reset or <code class="kbd kbd-xs">dfu</code> command)</p>
+        <p class="text-xs opacity-60 -mt-1" x-html="$t('dfu.description', { cmd: '<code class=\'kbd kbd-xs\'>dfu</code>' })"></p>
 
         <!-- Not supported alert -->
         <template x-if="!webSerialSupported">
           <div class="alert alert-warning alert-sm mt-2">
             <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            <span class="text-xs">Web Serial API requires Chrome 89+, Edge 89+, or Opera 76+.</span>
+            <span class="text-xs" x-text="$t('dfu.webSerialRequires')"></span>
           </div>
         </template>
 
@@ -925,19 +925,19 @@
             <div class="flex flex-wrap gap-2 items-end">
               <!-- Protocol select -->
               <div class="form-control">
-                <label class="label py-0"><span class="label-text text-xs">Protocol</span></label>
+                <label class="label py-0"><span class="label-text text-xs" x-text="$t('dfu.protocol')"></span></label>
                 <select class="select select-bordered select-sm w-40"
                         x-model="dfuProtocol"
                         :disabled="dfuState !== 'idle'">
-                  <option value="auto">Auto-detect</option>
-                  <option value="adafruit">Adafruit (Legacy)</option>
-                  <option value="nordic">Nordic (Secure)</option>
+                  <option value="auto" x-text="$t('dfu.autoDetect')"></option>
+                  <option value="adafruit" x-text="$t('dfu.adafruit')"></option>
+                  <option value="nordic" x-text="$t('dfu.nordic')"></option>
                 </select>
               </div>
 
               <!-- Firmware file picker -->
               <div class="form-control flex-1 min-w-[200px]">
-                <label class="label py-0"><span class="label-text text-xs">Firmware (ZIP / UF2 / HEX)</span></label>
+                <label class="label py-0"><span class="label-text text-xs" x-text="$t('dfu.firmwareLabel')"></span></label>
                 <input type="file" class="file-input file-input-bordered file-input-sm w-full"
                        accept=".zip,.uf2,.hex,.bin"
                        @change="dfuSelectFile($event)"
@@ -948,7 +948,7 @@
             <!-- Shared firmware from main OTA app -->
             <template x-if="sharedFirmwareFiles.length > 0 && dfuState === 'idle'">
               <div class="bg-base-200 rounded-lg px-3 py-2 space-y-1">
-                <div class="text-xs font-medium opacity-60">Or use loaded firmware:</div>
+                <div class="text-xs font-medium opacity-60" x-text="$t('dfu.orUseLoaded')"></div>
                 <div class="flex flex-wrap gap-1.5">
                   <template x-for="fw in sharedFirmwareFiles" :key="fw.id">
                     <button class="btn btn-xs gap-1"
@@ -971,11 +971,11 @@
                 <span class="badge badge-ghost badge-xs" x-text="(dfuFile.size / 1024).toFixed(1) + ' KB'"></span>
                 <span class="badge badge-outline badge-xs uppercase" x-text="dfuFileFormat"></span>
                 <template x-if="dfuFileSource === 'loaded'">
-                  <span class="badge badge-info badge-xs">from OTA</span>
+                  <span class="badge badge-info badge-xs" x-text="$t('dfu.fromOta')"></span>
                 </template>
                 <template x-if="dfuState === 'idle'">
                   <button class="btn btn-ghost btn-xs btn-circle ml-auto opacity-40 hover:opacity-100"
-                          @click="dfuClearFile()" title="Clear">
+                          @click="dfuClearFile()" :title="$t('dfu.clear')">
                     <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                   </button>
                 </template>
@@ -989,7 +989,7 @@
                         :disabled="!dfuFile"
                         @click="dfuStart()">
                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                  Flash via Serial
+                  <span x-text="$t('dfu.flashViaSerial')"></span>
                 </button>
               </template>
 
@@ -997,7 +997,7 @@
                 <button class="btn btn-error btn-sm btn-outline gap-2"
                         @click="dfuAbort()">
                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                  Abort
+                  <span x-text="$t('dfu.abort')"></span>
                 </button>
               </template>
             </div>
@@ -1022,10 +1022,10 @@
                 <svg x-show="dfuSuccess" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <svg x-show="!dfuSuccess" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <div>
-                  <p class="text-sm font-semibold" x-text="dfuSuccess ? 'DFU Complete!' : 'DFU Failed'"></p>
+                  <p class="text-sm font-semibold" x-text="dfuSuccess ? $t('dfu.dfuComplete') : $t('dfu.dfuFailed')"></p>
                   <p class="text-xs opacity-70" x-text="dfuResultMsg"></p>
                 </div>
-                <button class="btn btn-sm btn-ghost" @click="dfuReset()">Dismiss</button>
+                <button class="btn btn-sm btn-ghost" @click="dfuReset()" x-text="$t('update.dismiss')"></button>
               </div>
             </template>
 
@@ -1034,7 +1034,7 @@
               <div class="collapse collapse-arrow bg-base-200 rounded-lg">
                 <input type="checkbox" x-model="dfuLogExpanded">
                 <div class="collapse-title text-xs font-medium py-2 min-h-0">
-                  DFU Log
+                  <span x-text="$t('dfu.dfuLog')"></span>
                   <span class="badge badge-ghost badge-xs ml-1" x-text="dfuLogs.length"></span>
                 </div>
                 <div class="collapse-content">
@@ -1058,8 +1058,8 @@
                 @click="logExpanded = !logExpanded">
           <h2 class="card-title text-base">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            Log
-            <span class="badge badge-ghost badge-sm" x-text="logs.length + ' entries'"></span>
+            <span x-text="$t('log.title')"></span>
+            <span class="badge badge-ghost badge-sm" x-text="logs.length + ' ' + $t('log.entries')"></span>
           </h2>
           <svg class="w-4 h-4 transition-transform" :class="logExpanded ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
         </button>
@@ -1084,9 +1084,9 @@
        ═══════════════════════════════════════════════════════════════ -->
   <footer class="footer footer-center py-3 px-4 text-base-content/50 text-xs">
     <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-0.5">
-      <span class="whitespace-nowrap">SlimeNRF OTA Updater — by <a href="https://github.com/jitingcn" class="link link-hover" target="_blank" rel="noopener">jitingcn</a></span>
-      <a href="https://github.com/jitingcn/SlimeVR-Tracker-nRF" class="link link-hover whitespace-nowrap" target="_blank" rel="noopener">Tracker Firmware</a>
-      <a href="https://github.com/jitingcn/SlimeVR-Tracker-nRF-Receiver" class="link link-hover whitespace-nowrap" target="_blank" rel="noopener">Receiver Firmware</a>
+      <span class="whitespace-nowrap"><span x-text="$t('title')"></span> — <span x-text="$t('footer.by')"></span> <a href="https://github.com/jitingcn" class="link link-hover" target="_blank" rel="noopener">jitingcn</a></span>
+      <a href="https://github.com/jitingcn/SlimeVR-Tracker-nRF" class="link link-hover whitespace-nowrap" target="_blank" rel="noopener" x-text="$t('footer.trackerFirmware')"></a>
+      <a href="https://github.com/jitingcn/SlimeVR-Tracker-nRF-Receiver" class="link link-hover whitespace-nowrap" target="_blank" rel="noopener" x-text="$t('footer.receiverFirmware')"></a>
     </div>
   </footer>
 
