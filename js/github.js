@@ -275,23 +275,39 @@ export function openDownloadUrl(url) {
  */
 /**
  * Extract firmware files (.uf2, .hex) from a ZIP archive.
+ * When both .uf2 and .hex exist with the same base name, prefer .uf2.
  * @param {Uint8Array|ArrayBuffer} zipData
  * @returns {{ name: string, data: ArrayBuffer }[]}
  */
 export function extractUF2FromZip(zipData) {
   const data = zipData instanceof Uint8Array ? zipData : new Uint8Array(zipData);
   const extracted = unzipSync(data);
-  const firmwareFiles = [];
   const fwExtensions = ['.uf2', '.hex'];
 
+  // Collect all firmware files grouped by base name
+  const byBaseName = new Map(); // baseName → { uf2?: entry, hex?: entry }
   for (const [path, fileData] of Object.entries(extracted)) {
     const lower = path.toLowerCase();
-    if (fwExtensions.some(ext => lower.endsWith(ext))) {
-      firmwareFiles.push({
-        name: path.split('/').pop(),
-        data: fileData.buffer.slice(fileData.byteOffset, fileData.byteOffset + fileData.byteLength),
-      });
-    }
+    const ext = fwExtensions.find(e => lower.endsWith(e));
+    if (!ext) continue;
+
+    const fileName = path.split('/').pop();
+    const baseName = fileName.replace(/\.(uf2|hex)$/i, '');
+    const entry = {
+      name: fileName,
+      data: fileData.buffer.slice(fileData.byteOffset, fileData.byteOffset + fileData.byteLength),
+    };
+
+    if (!byBaseName.has(baseName)) byBaseName.set(baseName, {});
+    const group = byBaseName.get(baseName);
+    if (ext === '.uf2') group.uf2 = entry;
+    else group.hex = entry;
+  }
+
+  // Prefer .uf2 when both exist; fall back to .hex
+  const firmwareFiles = [];
+  for (const group of byBaseName.values()) {
+    firmwareFiles.push(group.uf2 || group.hex);
   }
 
   if (firmwareFiles.length === 0) {
