@@ -1,0 +1,31 @@
+{
+  "name": "slimenrf-ota-web",
+  "version": "1.0.0",
+  "description": "SlimeNRF OTA Firmware Update Tool (WebHID)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --open",
+    "preview": "vite preview",
+    "build": "vite build",
+    "deploy": "vite build && npx wrangler pages deploy",
+    "deploy:staging": "vite build && npx wrangler pages deploy --branch staging",
+    "pages:dev": "vite build && npx wrangler pages dev",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "@tauri-apps/cli": "^2.11.2",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "daisyui": "^5.5.20",
+    "tailwindcss": "^4.3.0",
+    "vite": "^6.0.0",
+    "wrangler": "^4.0.0"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.0",
+    "alpinejs": "^3.15.12",
+    "fflate": "^0.8.3"
+  }
+}

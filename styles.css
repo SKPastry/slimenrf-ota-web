@@ -1,0 +1,8 @@
+@import "tailwindcss";
+@plugin "daisyui";
+
+[x-cloak] { display: none !important; }
+
+.log-line {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+}

@@ -1,0 +1,10 @@
+name = "slimenrf-ota"
+compatibility_date = "2025-05-01"
+pages_build_output_dir = "dist"
+
+# Cloudflare Pages project
+# Build:  pnpm run build
+# Deploy: npx wrangler pages deploy
+# Dev:    npx wrangler pages dev
+#
+# Pages Functions in functions/ are auto-detected.
