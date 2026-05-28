@@ -82,12 +82,14 @@ Alpine.data('otaApp', () => ({
   trackerStatuses: {},   // { [tid]: statusString }
   batchInfo: { current: 0, total: 0, trackerIds: [] },
   updateSuccess: null,   // true/false/null
+  _updateDismissTimer: null,
 
   // ── Receiver OTA state ──────────────────────────────────────
   receiverInfo: null,           // parsed firmware info from receiver
   receiverInfoQueried: false,   // whether receiver info has been queried
   queryingReceiver: false,      // currently querying receiver info
   receiverUpdating: false,      // receiver OTA in progress
+  enteringDfu: false,           // sending DFU command via serial
 
   // ── Session ─────────────────────────────────────────────────
   _session: null,
@@ -758,6 +760,7 @@ Alpine.data('otaApp', () => ({
         (detectedBoard ? ` → ${detectedBoard}` : ''),
       );
       this._autoMapFirmware();
+      this._syncFirmwareStore();
     } catch (e) {
       this.log(`✗ Firmware parse error (${file.name}): ${e.message}`);
     }
@@ -801,6 +804,7 @@ Alpine.data('otaApp', () => ({
     }
     this.firmwareMapping = newMapping;
     this._autoMapFirmware();
+    this._syncFirmwareStore();
   },
 
   /** Save a loaded firmware file to local disk. */
@@ -855,6 +859,18 @@ Alpine.data('otaApp', () => ({
     this.firmwareMapping = newMapping;
   },
 
+  /** Sync loaded firmware list to the shared Alpine store for Serial DFU bridge. */
+  _syncFirmwareStore() {
+    Alpine.store('firmware').files = this.firmwareFiles.map(fw => ({
+      id: fw.id,
+      name: fw.file?.name ?? `firmware-${fw.id}`,
+      size: fw.raw.byteLength,
+      data: fw.raw,
+      format: fw.file?.name?.split('.').pop()?.toLowerCase() || 'uf2',
+      boardTarget: fw.detectedBoard || null,
+    }));
+  },
+
   /** Get firmware entry by id. */
   _getFirmware(id) {
     return this.firmwareFiles.find((f) => f.id === id);
@@ -887,6 +903,7 @@ Alpine.data('otaApp', () => ({
     const ids = this.selectedIds;
     this.updating = true;
     this.updateSuccess = null;
+    clearTimeout(this._updateDismissTimer);
     this.updatePhase = '';
     this.updateStep = 0;
     this.trackerStatuses = {};
@@ -988,6 +1005,12 @@ Alpine.data('otaApp', () => ({
       this.updateSuccess = allOk;
       this.log(allOk ? '✓ OTA update completed successfully!' : '⚠ OTA update completed with errors.');
 
+      // Auto-dismiss success after 8 seconds
+      if (allOk) {
+        clearTimeout(this._updateDismissTimer);
+        this._updateDismissTimer = setTimeout(() => { this.updateSuccess = null; }, 8000);
+      }
+
       // Auto-rescan after 5 seconds
       if (allOk && plan.length > 0) {
         this.log('Auto-rescan in 5 seconds…');
@@ -1047,6 +1070,56 @@ Alpine.data('otaApp', () => ({
       this.log(`✗ Receiver info query error: ${e.message}`);
     } finally {
       this.queryingReceiver = false;
+    }
+  },
+
+  /** Send 'dfu' command via serial to make receiver enter DFU bootloader mode. */
+  async enterReceiverDfu() {
+    if (!('serial' in navigator)) {
+      this.log('✗ Web Serial API not available');
+      return;
+    }
+    this.enteringDfu = true;
+    let port = null;
+    try {
+      port = await navigator.serial.requestPort({
+        filters: [
+          { usbVendorId: 0x1209 }, // pid.codes (SlimeVR/Styria)
+          { usbVendorId: 0x239A }, // Adafruit
+          { usbVendorId: 0x1915 }, // Nordic
+          { usbVendorId: 0x2FE3 },
+          { usbVendorId: 0x2886 }, // SeeedStudio
+          { usbVendorId: 0x1B4F }, // SparkFun
+        ],
+      });
+      await port.open({ baudRate: 115200 });
+      this.log('Serial connected — sending DFU command…');
+
+      const encoder = new TextEncoder();
+      const writer = port.writable.getWriter();
+      await writer.write(encoder.encode('dfu\r\n'));
+      writer.releaseLock();
+
+      // Brief pause for the device to process the command before it resets
+      await new Promise(r => setTimeout(r, 500));
+
+      try { await port.close(); } catch {}
+      this.log('✓ DFU command sent — device is rebooting into bootloader mode');
+      this.log('Wait a moment, then use Serial DFU below to flash firmware');
+
+      // Scroll to Serial DFU section
+      setTimeout(() => {
+        document.getElementById('serial-dfu-section')?.scrollIntoView({ behavior: 'smooth' });
+      }, 300);
+    } catch (e) {
+      if (e.name === 'NotFoundError') {
+        // User cancelled the port picker
+      } else {
+        this.log(`✗ DFU command error: ${e.message}`);
+      }
+    } finally {
+      try { if (port?.readable) await port.close(); } catch {}
+      this.enteringDfu = false;
     }
   },
 
@@ -1134,6 +1207,10 @@ Alpine.data('otaApp', () => ({
       this.updateSuccess = ok;
       this.updatePhase = 'complete';
       this.updateStep = 5;
+      if (ok) {
+        clearTimeout(this._updateDismissTimer);
+        this._updateDismissTimer = setTimeout(() => { this.updateSuccess = null; }, 8000);
+      }
     } catch (e) {
       this.log(`✗ Receiver OTA error: ${e.message}`);
       this.updateSuccess = false;
@@ -1377,6 +1454,7 @@ Alpine.data('otaApp', () => ({
         (detectedBoard ? ` → ${detectedBoard}` : ''),
       );
       this._autoMapFirmware();
+      this._syncFirmwareStore();
     } catch (e) {
       this.log(`✗ Firmware parse error (${name}): ${e.message}`);
     }
@@ -1436,6 +1514,12 @@ Alpine.data('otaApp', () => ({
 
 // ── Register Serial DFU component ─────────────────────────────────
 import './serial-dfu-ui.js';
+
+// ── Shared Firmware Store ───────────────────────────────────────────
+// Bridges the main OTA app's firmware list to the Serial DFU component
+Alpine.store('firmware', {
+  files: [], // [{ id, name, size, data: ArrayBuffer, format, boardTarget }]
+});
 
 // ── Start Alpine ──────────────────────────────────────────────────
 

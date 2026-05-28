@@ -12,9 +12,10 @@ Alpine.data('serialDfuApp', () => ({
   // Protocol selection
   dfuProtocol: 'auto', // 'auto' | 'adafruit' | 'nordic'
 
-  // File selection
+  // File selection — either from local file picker or from shared store
   dfuFile: null,      // { name, size, data: ArrayBuffer }
   dfuFileFormat: '',   // 'zip' | 'uf2' | 'hex' | 'bin'
+  dfuFileSource: '',   // 'local' | 'loaded' — where the firmware came from
 
   // Progress
   dfuProgress: 0,
@@ -31,6 +32,12 @@ Alpine.data('serialDfuApp', () => ({
 
   // Internal
   _dfuInstance: null,
+  _dfuDismissTimer: null,
+
+  // ─── Computed-like getters ────────────
+  get sharedFirmwareFiles() {
+    return Alpine.store('firmware')?.files ?? [];
+  },
 
   // ─── Methods ─────────────────────────
 
@@ -41,7 +48,23 @@ Alpine.data('serialDfuApp', () => ({
     const data = await file.arrayBuffer();
     this.dfuFile = { name: file.name, size: file.size, data };
     this.dfuFileFormat = this._detectFormat(file.name, new Uint8Array(data));
+    this.dfuFileSource = 'local';
     this._dfuLog(`Loaded: ${file.name} (${(file.size / 1024).toFixed(1)} KB, ${this.dfuFileFormat})`);
+  },
+
+  /** Use firmware already loaded in the main OTA app. */
+  dfuUseSharedFirmware(sharedFw) {
+    this.dfuFile = { name: sharedFw.name, size: sharedFw.size, data: sharedFw.data };
+    this.dfuFileFormat = this._detectFormat(sharedFw.name, new Uint8Array(sharedFw.data.slice(0, 16)));
+    this.dfuFileSource = 'loaded';
+    this._dfuLog(`Using loaded firmware: ${sharedFw.name} (${(sharedFw.size / 1024).toFixed(1)} KB, ${this.dfuFileFormat})`);
+  },
+
+  /** Clear the currently selected firmware. */
+  dfuClearFile() {
+    this.dfuFile = null;
+    this.dfuFileFormat = '';
+    this.dfuFileSource = '';
   },
 
   async dfuStart() {
@@ -87,6 +110,11 @@ Alpine.data('serialDfuApp', () => ({
       this.dfuResultMsg = success !== false
         ? 'Firmware updated successfully. Device will reboot.'
         : 'Update was cancelled.';
+
+      // Auto-dismiss success after 8 seconds
+      if (this.dfuSuccess) {
+        this._dfuDismissTimer = setTimeout(() => this.dfuReset(), 8000);
+      }
     } catch (err) {
       this.dfuState = 'done';
       this.dfuSuccess = false;
@@ -103,6 +131,7 @@ Alpine.data('serialDfuApp', () => ({
   },
 
   dfuReset() {
+    clearTimeout(this._dfuDismissTimer);
     this.dfuState = 'idle';
     this.dfuProgress = 0;
     this.dfuPhase = '';

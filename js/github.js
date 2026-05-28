@@ -273,25 +273,32 @@ export function openDownloadUrl(url) {
  * Extract .uf2 files from a zip archive (Uint8Array or ArrayBuffer).
  * Returns: [{ name: string, data: ArrayBuffer }]
  */
+/**
+ * Extract firmware files (.uf2, .hex) from a ZIP archive.
+ * @param {Uint8Array|ArrayBuffer} zipData
+ * @returns {{ name: string, data: ArrayBuffer }[]}
+ */
 export function extractUF2FromZip(zipData) {
   const data = zipData instanceof Uint8Array ? zipData : new Uint8Array(zipData);
   const extracted = unzipSync(data);
-  const uf2Files = [];
+  const firmwareFiles = [];
+  const fwExtensions = ['.uf2', '.hex'];
 
   for (const [path, fileData] of Object.entries(extracted)) {
-    if (path.endsWith('.uf2')) {
-      uf2Files.push({
+    const lower = path.toLowerCase();
+    if (fwExtensions.some(ext => lower.endsWith(ext))) {
+      firmwareFiles.push({
         name: path.split('/').pop(),
         data: fileData.buffer.slice(fileData.byteOffset, fileData.byteOffset + fileData.byteLength),
       });
     }
   }
 
-  if (uf2Files.length === 0) {
-    throw new Error('No .uf2 files found in archive');
+  if (firmwareFiles.length === 0) {
+    throw new Error('No firmware files (.uf2/.hex) found in archive');
   }
 
-  return uf2Files;
+  return firmwareFiles;
 }
 
 /**
