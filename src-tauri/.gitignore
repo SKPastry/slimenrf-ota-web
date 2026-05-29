@@ -4,7 +4,7 @@
 /gen/schemas
 
 # makepkg build artifacts
-src/
+/slimenrf-ota-git/
 pkg/
 *.pkg.tar.*
 *.log

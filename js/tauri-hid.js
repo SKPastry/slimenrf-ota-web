@@ -110,6 +110,7 @@ class TauriHID extends EventTarget {
     this._openedDevices = new Map(); // path → TauriHIDDevice
     this._knownPaths = new Set(); // track known device paths for connect detection
     this._pollTimer = null;
+    this._filters = []; // remembered from last requestDevice()
   }
 
   /**
@@ -117,6 +118,7 @@ class TauriHID extends EventTarget {
    * (no browser permission dialog needed in native app).
    */
   async requestDevice({ filters = [] } = {}) {
+    this._filters = filters; // remember for getDevices() and polling
     const devices = await this._listMatchingDevices(filters);
     // Track devices for getDevices()
     for (const d of devices) {
@@ -133,8 +135,7 @@ class TauriHID extends EventTarget {
    * In Tauri, we re-scan and return matching devices (no permission gating).
    */
   async getDevices() {
-    const devices = await this._listMatchingDevices([]);
-    // Update tracking
+    const devices = await this._listMatchingDevices(this._filters);
     const currentPaths = new Set(devices.map(d => d._path));
     for (const [path] of this._openedDevices) {
       if (!currentPaths.has(path)) this._openedDevices.delete(path);
@@ -184,7 +185,7 @@ class TauriHID extends EventTarget {
     if (this._pollTimer) return;
     this._pollTimer = setInterval(async () => {
       try {
-        const devices = await this._listMatchingDevices([]);
+        const devices = await this._listMatchingDevices(this._filters);
         for (const d of devices) {
           if (!this._knownPaths.has(d._path)) {
             this._knownPaths.add(d._path);

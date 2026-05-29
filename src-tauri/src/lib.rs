@@ -120,14 +120,14 @@ fn hid_open_device(
                     std::thread::sleep(std::time::Duration::from_millis(1));
                 }
                 Ok(n) => {
-                    // First byte from hidapi read is the report ID
-                    let report_id = buf[0];
-                    let data = buf[1..n].to_vec();
+                    // hidapi read does NOT prepend report ID for report-ID-0 devices.
+                    // SlimeNRF uses report ID 0, so buf[0..n] is pure data.
+                    let data = buf[..n].to_vec();
                     drop(dev);
                     consecutive_errors = 0;
                     let event = InputReportEvent {
                         device_path: reader_path.clone(),
-                        report_id,
+                        report_id: 0,
                         data,
                     };
                     let _ = app.emit("hid-input-report", &event);
