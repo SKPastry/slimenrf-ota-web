@@ -36,6 +36,8 @@ class TauriHIDDevice extends EventTarget {
     this.serialNumber = info.serialNumber || '';
     this.opened = false;
     this._unlisten = null;
+    this._unlistenDisconnect = null;
+    this._oninputreportHandler = null;
   }
 
   async open() {
@@ -55,14 +57,22 @@ class TauriHIDDevice extends EventTarget {
       inputEvent.device = this;
       this.dispatchEvent(inputEvent);
     });
+
+    // Listen for device disconnection
+    this._unlistenDisconnect = await _listen('hid-device-disconnected', (event) => {
+      if (event.payload?.devicePath !== this._path) return;
+      this.opened = false;
+      if (this._unlisten) { this._unlisten(); this._unlisten = null; }
+      if (this._unlistenDisconnect) { this._unlistenDisconnect(); this._unlistenDisconnect = null; }
+      // Notify the TauriHID manager (set by installTauriHID)
+      if (this._onDisconnect) this._onDisconnect(this);
+    });
   }
 
   async close() {
     await ensureTauriAPI();
-    if (this._unlisten) {
-      this._unlisten();
-      this._unlisten = null;
-    }
+    if (this._unlisten) { this._unlisten(); this._unlisten = null; }
+    if (this._unlistenDisconnect) { this._unlistenDisconnect(); this._unlistenDisconnect = null; }
     try {
       await _invoke('hid_close_device', { path: this._path });
     } catch { /* ignore if already closed */ }
@@ -72,17 +82,22 @@ class TauriHIDDevice extends EventTarget {
   async sendReport(reportId, data) {
     await ensureTauriAPI();
     const arr = data instanceof Uint8Array ? Array.from(data) : Array.from(new Uint8Array(data));
-    await _invoke('hid_write', { path: this._path, data: arr });
+    await _invoke('hid_write', { path: this._path, reportId, data: arr });
   }
 
-  // Convenience: match WebHID oninputreport setter pattern
+  // Match WebHID oninputreport setter pattern (properly handles replacement)
   set oninputreport(handler) {
+    if (this._oninputreportHandler) {
+      this.removeEventListener('inputreport', this._oninputreportHandler);
+    }
     this._oninputreportHandler = handler;
-    this.addEventListener('inputreport', handler);
+    if (handler) {
+      this.addEventListener('inputreport', handler);
+    }
   }
 
   get oninputreport() {
-    return this._oninputreportHandler || null;
+    return this._oninputreportHandler;
   }
 }
 
@@ -90,16 +105,51 @@ class TauriHIDDevice extends EventTarget {
  * Tauri-backed navigator.hid replacement.
  */
 class TauriHID extends EventTarget {
+  constructor() {
+    super();
+    this._openedDevices = new Map(); // path → TauriHIDDevice
+  }
+
   /**
    * requestDevice — lists all matching devices and returns them
    * (no browser permission dialog needed in native app).
    */
   async requestDevice({ filters = [] } = {}) {
-    await ensureTauriAPI();
+    const devices = await this._listMatchingDevices(filters);
+    // Track devices for getDevices()
+    for (const d of devices) {
+      this._openedDevices.set(d._path, d);
+      d._onDisconnect = (dev) => this._handleDisconnect(dev);
+    }
+    return devices;
+  }
 
+  /**
+   * getDevices — return previously seen devices that are still connected.
+   * In Tauri, we re-scan and return matching devices (no permission gating).
+   */
+  async getDevices() {
+    const devices = await this._listMatchingDevices([]);
+    // Update tracking
+    const currentPaths = new Set(devices.map(d => d._path));
+    for (const [path] of this._openedDevices) {
+      if (!currentPaths.has(path)) this._openedDevices.delete(path);
+    }
+    for (const d of devices) {
+      if (!this._openedDevices.has(d._path)) {
+        this._openedDevices.set(d._path, d);
+        d._onDisconnect = (dev) => this._handleDisconnect(dev);
+      }
+    }
+    // Return tracked device instances (preserve opened state)
+    return Array.from(this._openedDevices.values());
+  }
+
+  /** List and deduplicate matching HID devices. */
+  async _listMatchingDevices(filters) {
+    await ensureTauriAPI();
     const vid = filters[0]?.vendorId || 0;
     const pid = filters[0]?.productId || 0;
-
     const deviceList = await _invoke('hid_list_devices', { vid, pid });
 
     // Deduplicate by serial number (hidapi may list multiple interfaces)
@@ -107,15 +157,20 @@ class TauriHID extends EventTarget {
     for (const info of deviceList) {
       const key = info.serialNumber || info.path;
       if (!seen.has(key)) {
-        seen.set(key, info);
+        // Reuse existing device instance if we already track this path
+        const existing = this._openedDevices.get(info.path);
+        seen.set(key, existing || new TauriHIDDevice(info));
       }
     }
-
-    return Array.from(seen.values()).map(info => new TauriHIDDevice(info));
+    return Array.from(seen.values());
   }
 
-  async getDevices() {
-    return [];
+  /** Handle device disconnection — emit 'disconnect' event (matches WebHID spec). */
+  _handleDisconnect(device) {
+    this._openedDevices.delete(device._path);
+    const event = new Event('disconnect');
+    event.device = device;
+    this.dispatchEvent(event);
   }
 }
 

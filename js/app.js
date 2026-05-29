@@ -14,10 +14,12 @@ import {
   extractUF2FromZip, isProxyAvailable, formatDate, formatSize,
 } from './github.js';
 import { isTauri, installTauriHID } from './tauri-hid.js';
+import { installTauriSerial } from './tauri-serial.js';
 
-// Install Tauri HID polyfill before anything else
+// Install Tauri polyfills before anything else
 if (isTauri()) {
   installTauriHID();
+  installTauriSerial();
 }
 
 // ── Alpine.js Component ─────────────────────────────────────────────

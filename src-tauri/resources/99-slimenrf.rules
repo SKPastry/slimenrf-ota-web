@@ -1,0 +1,19 @@
+# SlimeNRF OTA — udev rules for HID and Serial access on Linux
+# Install: sudo cp 99-slimenrf.rules /etc/udev/rules.d/ && sudo udevadm control --reload-rules
+
+# SlimeNRF Receiver (HID) — pid.codes VID
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="7690", MODE="0666", TAG+="uaccess"
+
+# DFU bootloader serial ports
+# Nordic Semiconductor (nRF5 Open DFU)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1915", MODE="0666", TAG+="uaccess"
+# Adafruit (UF2 bootloader)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="239a", MODE="0666", TAG+="uaccess"
+# pid.codes (Styria, SlimeVR)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1209", MODE="0666", TAG+="uaccess"
+# nRF DFU
+SUBSYSTEM=="tty", ATTRS{idVendor}=="2fe3", MODE="0666", TAG+="uaccess"
+# SeeedStudio (XIAO)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="2886", MODE="0666", TAG+="uaccess"
+# SparkFun
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1b4f", MODE="0666", TAG+="uaccess"
