@@ -296,6 +296,9 @@
                     <div class="flex justify-between">
                       <span x-text="'v' + trackers[tid].info.version"></span>
                       <span x-text="(trackers[tid].info.firmwareSize / 1024).toFixed(0) + ' KB'"></span>
+                      <template x-if="trackers[tid].info.flashBase > 0">
+                        <span class="font-mono" x-text="'0x' + trackers[tid].info.flashBase.toString(16).padStart(5, '0')"></span>
+                      </template>
                     </div>
                     <div class="truncate" x-text="trackers[tid].info.boardTarget"></div>
                     <div class="opacity-50 text-[10px]" x-text="trackers[tid].info.buildDate"></div>

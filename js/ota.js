@@ -135,12 +135,12 @@ export class OTASession {
 
     const chunks = await this._collectReports(
       (r) => r[0] === HID_OTA_FW_INFO && r[1] === trackerId,
-      { timeoutMs, count: 4 },
+      { timeoutMs, count: 6 },
     );
 
     if (chunks.length === 0) return null;
-    if (chunks.length < 3) {
-      this._log(`Tracker ${trackerId}: only ${chunks.length}/4 info chunks received`);
+    if (chunks.length < 5) {
+      this._log(`Tracker ${trackerId}: only ${chunks.length}/6 info chunks received`);
     }
     return parseFwInfo(chunks);
   }
@@ -159,11 +159,11 @@ export class OTASession {
       await this._send(buildQueryInfo(tid));
       const chunks = await this._collectReports(
         (r) => r[0] === HID_OTA_FW_INFO && r[1] === tid,
-        { timeoutMs: perTimeout, count: 4 },
+        { timeoutMs: perTimeout, count: 6 },
       );
       const info = chunks.length > 0 ? parseFwInfo(chunks) : null;
-      if (chunks.length > 0 && chunks.length < 3) {
-        this._log(`Tracker ${tid}: only ${chunks.length}/4 info chunks received`);
+      if (chunks.length > 0 && chunks.length < 5) {
+        this._log(`Tracker ${tid}: only ${chunks.length}/6 info chunks received`);
       }
       results[tid] = info;
       if (onResult) onResult(tid, info);
