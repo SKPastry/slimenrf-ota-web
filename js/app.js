@@ -1015,19 +1015,27 @@ Alpine.data('otaApp', () => ({
 
         let fw = fwEntry.parsed;
 
+        // Determine effective device base: use reported flashBase, or infer from sdPlusApp flag
+        let deviceBase = group.info.flashBase;
+        if (deviceBase === 0 && fwEntry.sdPlusApp) {
+          // Tracker doesn't report flashBase (old firmware) but we detected SD+App at load time.
+          // Use 0x27000 as the standard SoftDevice app base for extraction.
+          deviceBase = 0x27000;
+        }
+
         // Check flash base mismatch
-        if (group.info.flashBase !== 0 && fw.baseAddress !== group.info.flashBase) {
-          if (fw.baseAddress > group.info.flashBase) {
+        if (deviceBase !== 0 && fw.baseAddress !== deviceBase) {
+          if (fw.baseAddress > deviceBase) {
             // Firmware expects SoftDevice that isn't present — block
-            this.log(`✗ Firmware base 0x${fw.baseAddress.toString(16).padStart(5, '0')} > tracker base 0x${group.info.flashBase.toString(16).padStart(5, '0')} — firmware requires SoftDevice not present. Skipping ${bt}.`);
+            this.log(`✗ Firmware base 0x${fw.baseAddress.toString(16).padStart(5, '0')} > tracker base 0x${deviceBase.toString(16).padStart(5, '0')} — firmware requires SoftDevice not present. Skipping ${bt}.`);
             continue;
           }
           // fw.baseAddress < device base: check if SD+App or pure app
-          if (looksLikeSdPlusApp(fw.data, fw.baseAddress, group.info.flashBase)) {
+          if (looksLikeSdPlusApp(fw.data, fw.baseAddress, deviceBase)) {
             // SD+App image: re-parse to extract only the application portion
-            this.log(`Detected SD+App image, extracting app at 0x${group.info.flashBase.toString(16).padStart(5, '0')}…`);
+            this.log(`Detected SD+App image, extracting app at 0x${deviceBase.toString(16).padStart(5, '0')}…`);
             try {
-              fw = this._parseFirmware(fwEntry.raw, fwEntry.file.name, group.info.flashBase);
+              fw = this._parseFirmware(fwEntry.raw, fwEntry.file.name, deviceBase);
               this.log(`Extracted: ${(fw.data.length / 1024).toFixed(1)} KB at 0x${fw.baseAddress.toString(16).padStart(5, '0')}`);
             } catch (e) {
               this.log(`✗ Cannot extract app from SD+App image: ${e.message}. Skipping ${bt}.`);
@@ -1035,7 +1043,7 @@ Alpine.data('otaApp', () => ({
             }
           } else {
             // Pure app at lower base: cross-base update (removing SoftDevice), use as-is
-            this.log(`Cross-base update: firmware at 0x${fw.baseAddress.toString(16).padStart(5, '0')}, tracker at 0x${group.info.flashBase.toString(16).padStart(5, '0')} — proceeding`);
+            this.log(`Cross-base update: firmware at 0x${fw.baseAddress.toString(16).padStart(5, '0')}, tracker at 0x${deviceBase.toString(16).padStart(5, '0')} — proceeding`);
           }
         }
 
@@ -1226,18 +1234,24 @@ Alpine.data('otaApp', () => ({
 
     let fw = fwEntry.parsed;
 
+    // Determine effective device base: use reported flashBase, or infer from sdPlusApp flag
+    let deviceBase = this.receiverInfo.flashBase;
+    if (deviceBase === 0 && fwEntry.sdPlusApp) {
+      deviceBase = 0x27000;
+    }
+
     // Check flash base mismatch
-    if (this.receiverInfo.flashBase !== 0 && fw.baseAddress !== this.receiverInfo.flashBase) {
-      if (fw.baseAddress > this.receiverInfo.flashBase) {
+    if (deviceBase !== 0 && fw.baseAddress !== deviceBase) {
+      if (fw.baseAddress > deviceBase) {
         // Firmware expects SoftDevice that isn't present — block
-        this.log(`✗ Firmware base 0x${fw.baseAddress.toString(16).padStart(5, '0')} > receiver base 0x${this.receiverInfo.flashBase.toString(16).padStart(5, '0')} — firmware requires SoftDevice not present.`);
+        this.log(`✗ Firmware base 0x${fw.baseAddress.toString(16).padStart(5, '0')} > receiver base 0x${deviceBase.toString(16).padStart(5, '0')} — firmware requires SoftDevice not present.`);
         return false;
       }
       // fw.baseAddress < device base: check if SD+App or pure app
-      if (looksLikeSdPlusApp(fw.data, fw.baseAddress, this.receiverInfo.flashBase)) {
-        this.log(`Detected SD+App image, extracting app at 0x${this.receiverInfo.flashBase.toString(16).padStart(5, '0')}…`);
+      if (looksLikeSdPlusApp(fw.data, fw.baseAddress, deviceBase)) {
+        this.log(`Detected SD+App image, extracting app at 0x${deviceBase.toString(16).padStart(5, '0')}…`);
         try {
-          fw = this._parseFirmware(fwEntry.raw, fwEntry.file.name, this.receiverInfo.flashBase);
+          fw = this._parseFirmware(fwEntry.raw, fwEntry.file.name, deviceBase);
           this.log(`Extracted: ${(fw.data.length / 1024).toFixed(1)} KB at 0x${fw.baseAddress.toString(16).padStart(5, '0')}`);
         } catch (e) {
           this.log(`✗ Cannot extract app from SD+App image: ${e.message}`);
@@ -1245,7 +1259,7 @@ Alpine.data('otaApp', () => ({
         }
       } else {
         // Pure app at lower base: cross-base update (removing SoftDevice), use as-is
-        this.log(`Cross-base update: firmware at 0x${fw.baseAddress.toString(16).padStart(5, '0')}, receiver at 0x${this.receiverInfo.flashBase.toString(16).padStart(5, '0')} — proceeding`);
+        this.log(`Cross-base update: firmware at 0x${fw.baseAddress.toString(16).padStart(5, '0')}, receiver at 0x${deviceBase.toString(16).padStart(5, '0')} — proceeding`);
       }
     }
 
