@@ -388,7 +388,9 @@ fn serial_write(
     let state = state.lock();
     let open_port = state.ports.get(&path).ok_or("Port not open")?;
     let mut port = open_port.port.lock();
-    port.write(&data).map_err(|e| e.to_string())
+    use std::io::Write;
+    port.write_all(&data).map_err(|e| e.to_string())?;
+    Ok(data.len())
 }
 
 #[tauri::command]

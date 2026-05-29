@@ -118,8 +118,9 @@ Alpine.data('serialDfuApp', () => ({
     } catch (err) {
       this.dfuState = 'done';
       this.dfuSuccess = false;
-      this.dfuResultMsg = err.message || 'Unknown error';
-      this._dfuLog(`Error: ${err.message}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      this.dfuResultMsg = msg || 'Unknown error';
+      this._dfuLog(`Error: ${msg}`);
     } finally {
       this._dfuInstance = null;
     }

@@ -202,9 +202,8 @@ class TauriWritableStream {
  */
 class TauriSerial extends EventTarget {
   /**
-   * requestPort — lists serial ports matching filters and lets user pick.
-   * In Tauri, we auto-select by VID/PID (no browser dialog).
-   * If multiple ports match, returns the first one.
+   * requestPort — lists serial ports matching filters and shows a picker dialog.
+   * In Tauri, we show a custom modal since there's no browser permission dialog.
    */
   async requestPort({ filters = [] } = {}) {
     await ensureTauriAPI();
@@ -229,15 +228,67 @@ class TauriSerial extends EventTarget {
     }
 
     if (matching.length === 0) {
-      throw new DOMException('No port selected', 'NotFoundError');
+      throw new DOMException('No compatible serial port found', 'NotFoundError');
     }
 
-    // Return the first matching port
-    return new TauriSerialPort(matching[0]);
+    // Single match → auto-select (no dialog needed)
+    if (matching.length === 1) {
+      return new TauriSerialPort(matching[0]);
+    }
+
+    // Multiple matches → show picker dialog
+    const selected = await this._showPortPicker(matching);
+    if (!selected) {
+      throw new DOMException('No port selected', 'NotFoundError');
+    }
+    return new TauriSerialPort(selected);
   }
 
   async getPorts() {
     return [];
+  }
+
+  /** Show a modal dialog for serial port selection. Returns selected port info or null. */
+  _showPortPicker(ports) {
+    return new Promise((resolve) => {
+      const dialog = document.createElement('dialog');
+      dialog.className = 'modal modal-open';
+      dialog.innerHTML = `
+        <div class="modal-box max-w-sm">
+          <h3 class="font-bold text-lg mb-3">Select Serial Port</h3>
+          <div class="space-y-1.5" id="_serial-port-list"></div>
+          <div class="modal-action">
+            <button class="btn btn-sm btn-ghost" id="_serial-cancel">Cancel</button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+      `;
+
+      const list = dialog.querySelector('#_serial-port-list');
+      for (const port of ports) {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-block btn-sm btn-outline justify-start gap-2 font-mono text-xs';
+        const vid = port.vendorId ? `${port.vendorId.toString(16).toUpperCase().padStart(4, '0')}` : '----';
+        const pid = port.productId ? `${port.productId.toString(16).toUpperCase().padStart(4, '0')}` : '----';
+        const name = port.productName || port.path;
+        btn.innerHTML = `
+          <span class="badge badge-ghost badge-xs">${vid}:${pid}</span>
+          <span class="truncate">${name}</span>
+          <span class="opacity-40 ml-auto">${port.path}</span>
+        `;
+        btn.addEventListener('click', () => { cleanup(); resolve(port); });
+        list.appendChild(btn);
+      }
+
+      dialog.querySelector('#_serial-cancel').addEventListener('click', () => { cleanup(); resolve(null); });
+      dialog.querySelector('.modal-backdrop button').addEventListener('click', () => { cleanup(); resolve(null); });
+
+      function cleanup() {
+        dialog.remove();
+      }
+
+      document.body.appendChild(dialog);
+    });
   }
 }
 

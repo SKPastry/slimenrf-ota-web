@@ -309,7 +309,7 @@ export class NordicDfu {
         }
       }
     } catch (err) {
-      if (this._reading) this._onLog(`Read error: ${err.message}`);
+      if (this._reading) this._onLog(`Read error: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
