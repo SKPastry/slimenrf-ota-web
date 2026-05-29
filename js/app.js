@@ -590,6 +590,8 @@ Alpine.data('otaApp', () => ({
           info = await this._session.queryInfo(tid);
         }
         this.trackers[tid] = { ...this.trackers[tid], info: info || null, infoQueried: true };
+        // Auto-select trackers with valid OTA info
+        if (info && !this.updating) this.selectedTrackers[tid] = true;
       } catch { /* ignore query failures during monitoring */ }
       this.queryingTrackers = { ...this.queryingTrackers, [tid]: false };
     }
@@ -646,6 +648,8 @@ Alpine.data('otaApp', () => ({
             info: info || null,
             infoQueried: true,
           };
+          // Auto-select trackers with valid OTA info
+          if (info) this.selectedTrackers[tid] = true;
         } catch {
           this.trackers[tid] = { ...this.trackers[tid], info: null, infoQueried: true };
         } finally {
@@ -1052,11 +1056,17 @@ Alpine.data('otaApp', () => ({
 
   // ── Receiver OTA ──────────────────────────────────────────────
 
-  async queryReceiverInfo() {
+  async queryReceiverInfo({ autoRetry = true } = {}) {
     if (!this._session) return;
     this.queryingReceiver = true;
     try {
-      const info = await this._session.queryReceiverInfo({ timeoutMs: 5000 });
+      let info = await this._session.queryReceiverInfo({ timeoutMs: 5000 });
+      // Auto-retry once if no response (receiver may not be ready yet)
+      if (!info && autoRetry) {
+        await new Promise((r) => setTimeout(r, 2000));
+        if (!this._session) return; // disconnected during delay
+        info = await this._session.queryReceiverInfo({ timeoutMs: 5000 });
+      }
       if (info) {
         this.receiverInfo = info;
         this.receiverInfoQueried = true;
@@ -1065,17 +1075,15 @@ Alpine.data('otaApp', () => ({
           `flash:0x${info.flashBase.toString(16).padStart(5, '0')}  ` +
           `${(info.firmwareSize / 1024).toFixed(0)}KB  ${info.bootloader}`,
         );
-        // Re-parse any already-loaded receiver firmware with correct flash base
         this._reparseReceiverFirmware();
-        // Trigger auto-mapping now that we have receiver board target
         this._autoMapFirmware();
         if (info.bootloader === 'nrf5_opendfu') {
-          this.log('⚠ nRF5 OpenDFU bootloader detected — receiver self-OTA is not available (ACL flash protection). Update this receiver via SWD or DFU.');
+          this.log('⚠ nRF5 OpenDFU bootloader detected — enter DFU mode (double-tap reset), then use Serial DFU below to flash.');
         }
       } else {
         this.receiverInfo = null;
         this.receiverInfoQueried = true;
-        this.log('✗ Receiver OTA not supported (no response)');
+        this.log('⚠ Receiver did not respond — tap Refresh to retry');
       }
     } catch (e) {
       this.receiverInfoQueried = true;
@@ -1327,7 +1335,8 @@ Alpine.data('otaApp', () => ({
       assets = assets.filter((a) => a.type === this.ghReleaseFilter);
     }
     const isReceiver = this.ghReleaseFilter === 'receiver';
-    return this._ghFilterAssets(assets, isReceiver);
+    const isAll = this.ghReleaseFilter === 'all';
+    return this._ghFilterAssets(assets, isReceiver, isAll);
   },
 
   /** Annotate and filter/sort CI artifacts by detected tracker board targets. */
@@ -1341,14 +1350,32 @@ Alpine.data('otaApp', () => ({
   },
 
   /** Filter and sort asset/artifact list: matched items first, optionally hide unmatched. */
-  _ghFilterAssets(items, isReceiver = false) {
-    const targets = isReceiver
-      ? (this.receiverInfo?.boardTarget ? [this.receiverInfo.boardTarget] : [])
-      : this.ghDetectedTargets;
-    const matchFn = isReceiver ? matchReceiverBoardTarget : matchBoardTarget;
+  _ghFilterAssets(items, isReceiver = false, isAll = false) {
+    const trkTargets = this.ghDetectedTargets;
+    const rcvTargets = this.receiverInfo?.boardTarget ? [this.receiverInfo.boardTarget] : [];
+
     const annotated = items.map((item) => {
-      const board = matchFn(item.name);
-      const matched = board && targets.includes(board);
+      let board, matched;
+      if (isAll) {
+        // Try both matchers: receiver first (more specific), then tracker
+        const rcvBoard = matchReceiverBoardTarget(item.name);
+        const trkBoard = matchBoardTarget(item.name);
+        if (rcvBoard && rcvTargets.includes(rcvBoard)) {
+          board = rcvBoard;
+          matched = true;
+        } else if (trkBoard && trkTargets.includes(trkBoard)) {
+          board = trkBoard;
+          matched = true;
+        } else {
+          board = rcvBoard || trkBoard;
+          matched = false;
+        }
+      } else {
+        const targets = isReceiver ? rcvTargets : trkTargets;
+        const matchFn = isReceiver ? matchReceiverBoardTarget : matchBoardTarget;
+        board = matchFn(item.name);
+        matched = board && targets.includes(board);
+      }
       return { ...item, _matchedTarget: board, _matched: matched };
     });
 
@@ -1359,7 +1386,7 @@ Alpine.data('otaApp', () => ({
       return a.name.localeCompare(b.name);
     });
 
-    if (this.ghFilterByTarget && targets.length > 0) {
+    if (this.ghFilterByTarget && (trkTargets.length > 0 || rcvTargets.length > 0)) {
       return annotated.filter((item) => item._matched);
     }
     return annotated;
