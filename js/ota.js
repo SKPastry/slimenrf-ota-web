@@ -71,6 +71,15 @@ export class OTASession {
     await this.device.sendReport(0x00, pkt);
   }
 
+  /** Send multiple packets in one call if device supports batching, else individual sends. */
+  async _sendBatch(pkts) {
+    if (this.device.sendReportBatch) {
+      await this.device.sendReportBatch(0x00, pkts);
+    } else {
+      await Promise.all(pkts.map(p => this.device.sendReport(0x00, p)));
+    }
+  }
+
   /** Collect OTA sub-reports matching `filter` until count or timeout. */
   _collectReports(filter, { timeoutMs = 5000, count = Infinity } = {}) {
     return new Promise((resolve) => {
@@ -262,7 +271,11 @@ export class OTASession {
     const alive = () => activeIds.filter((t) => !failedIds.has(t));
     const minSeq = () => Math.min(...alive().map((t) => trkSeq[t] ?? 0));
 
-    const reportProgress = () => {
+    let lastProgressTime = 0;
+    const reportProgress = (force = false) => {
+      const now = performance.now();
+      if (!force && now - lastProgressTime < 100) return; // throttle to 10 Hz
+      lastProgressTime = now;
       const ids = alive();
       if (ids.length === 0) return;
       const consumed = minSeq();
@@ -299,14 +312,14 @@ export class OTASession {
           const headroom = MAX_IN_FLIGHT - inFlight;
           const burst = warmup ? Math.min(8, headroom) : Math.min(BURST_SIZE, headroom);
 
-          const sends = [];
+          const pkts = [];
           for (let i = 0; i < burst && nextSeq < totalPackets; i++) {
             const off = nextSeq * OTA_DATA_MAX_PAYLOAD;
             const chunk = firmware.data.subarray(off, off + OTA_DATA_MAX_PAYLOAD);
-            sends.push(this._send(buildData(activeIds[0], nextSeq, chunk)));
+            pkts.push(buildData(activeIds[0], nextSeq, chunk));
             nextSeq++;
           }
-          await Promise.all(sends);
+          await this._sendBatch(pkts);
 
           await sleep(1); // yield for input reports
           reportProgress();

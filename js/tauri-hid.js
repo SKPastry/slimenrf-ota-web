@@ -85,6 +85,18 @@ class TauriHIDDevice extends EventTarget {
     await _invoke('hid_write', { path: this._path, reportId, data: arr });
   }
 
+  /**
+   * Send multiple HID reports in a single IPC call (Tauri-only optimization).
+   * Reduces IPC overhead for bulk transfers like OTA firmware streaming.
+   */
+  async sendReportBatch(reportId, dataArrays) {
+    await ensureTauriAPI();
+    const reports = dataArrays.map(d =>
+      d instanceof Uint8Array ? Array.from(d) : Array.from(new Uint8Array(d))
+    );
+    await _invoke('hid_write_batch', { path: this._path, reportId, reports });
+  }
+
   // Match WebHID oninputreport setter pattern (properly handles replacement)
   set oninputreport(handler) {
     if (this._oninputreportHandler) {

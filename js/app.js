@@ -808,6 +808,7 @@ Alpine.data('otaApp', () => ({
   },
 
   removeFirmware(id) {
+    const removed = this.firmwareFiles.find((f) => f.id === id);
     this.firmwareFiles = this.firmwareFiles.filter((f) => f.id !== id);
     // Clean up mappings pointing to removed firmware
     const newMapping = {};
@@ -817,6 +818,18 @@ Alpine.data('otaApp', () => ({
     this.firmwareMapping = newMapping;
     this._autoMapFirmware();
     this._syncFirmwareStore();
+    // Clear GitHub download state so user can re-download
+    if (removed?.file?.name) {
+      const stem = removed.file.name.replace(/\.[^.]+$/, '');
+      const newDl = { ...this.ghDownloading };
+      for (const key of Object.keys(newDl)) {
+        // Match by exact name suffix or stem (handles both release assets and CI artifacts)
+        if (key.endsWith(`:${removed.file.name}`) || key.endsWith(`:${stem}`)) {
+          delete newDl[key];
+        }
+      }
+      this.ghDownloading = newDl;
+    }
   },
 
   /** Save a loaded firmware file to local disk. */

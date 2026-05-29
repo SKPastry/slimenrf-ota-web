@@ -199,6 +199,28 @@ fn hid_write(
     device.write(&report).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn hid_write_batch(
+    path: String,
+    report_id: Option<u8>,
+    reports: Vec<Vec<u8>>,
+    state: tauri::State<'_, Mutex<HidState>>,
+) -> Result<usize, String> {
+    let state = state.lock();
+    let open_dev = state.devices.get(&path).ok_or("Device not open")?;
+    let device = open_dev.device.lock();
+    let rid = report_id.unwrap_or(0x00);
+    let mut written = 0;
+    for data in &reports {
+        let mut report = Vec::with_capacity(1 + data.len());
+        report.push(rid);
+        report.extend_from_slice(data);
+        device.write(&report).map_err(|e| e.to_string())?;
+        written += 1;
+    }
+    Ok(written)
+}
+
 // ── Serial port commands ────────────────────────────────────────────
 
 #[derive(Debug, Serialize, Clone)]
@@ -436,6 +458,7 @@ pub fn run() {
             hid_open_device,
             hid_close_device,
             hid_write,
+            hid_write_batch,
             serial_list_ports,
             serial_open,
             serial_write,
