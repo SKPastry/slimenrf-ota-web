@@ -10,14 +10,10 @@
     "deploy": "vite build && npx wrangler pages deploy --commit-dirty=true",
     "deploy:prod": "vite build && npx wrangler pages deploy --branch production --commit-dirty=true",
     "deploy:staging": "vite build && npx wrangler pages deploy --branch staging --commit-dirty=true",
-    "pages:dev": "vite build && npx wrangler pages dev",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "pages:dev": "vite build && npx wrangler pages dev"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
-    "@tauri-apps/cli": "^2.11.2",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
     "daisyui": "^5.5.20",
     "tailwindcss": "^4.3.0",
@@ -25,8 +21,6 @@
     "wrangler": "^4.0.0"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.11.0",
-    "@tauri-apps/plugin-http": "^2.5.9",
     "alpinejs": "^3.15.12",
     "fflate": "^0.8.3"
   }

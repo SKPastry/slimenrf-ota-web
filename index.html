@@ -410,7 +410,7 @@
                     <div class="mt-2 space-y-1">
                       <div class="text-xs opacity-50 mb-1.5">
                         <span x-text="ghFilteredReleaseAssets.length + '/' + ghCurrentRelease.assets.filter(a => ghReleaseFilter === 'all' || a.type === ghReleaseFilter).length"></span> <span x-text="$t('gh.firmwaresShown')"></span>
-                        <span class="text-warning ml-1" x-show="!isTauri && !ghProxyAvailable"
+                        <span class="text-warning ml-1" x-show="!ghProxyAvailable"
                               title="Release downloads open in a new tab — drag and drop the .uf2 file to load" x-text="'· ' + $t('gh.releasesOpensInTab')"></span>
                       </div>
                       <div class="max-h-64 overflow-y-auto space-y-1 pr-0.5">
@@ -500,7 +500,7 @@
                     <div class="mt-2 space-y-1">
                       <div class="text-xs opacity-50 mb-1.5">
                         <span x-text="ghFilteredArtifacts.length + '/' + ghRunArtifacts.length"></span> <span x-text="$t('gh.artifactsShown')"></span>
-                        <span class="text-warning ml-1" x-show="!isTauri && !ghProxyAvailable" x-text="'· ' + $t('gh.opensInTab')"></span>
+                        <span class="text-warning ml-1" x-show="!ghProxyAvailable" x-text="'· ' + $t('gh.opensInTab')"></span>
                       </div>
                       <div class="max-h-64 overflow-y-auto space-y-1 pr-0.5">
                         <template x-for="artifact in ghFilteredArtifacts" :key="artifact.name">
@@ -601,7 +601,7 @@
                     <div class="mt-2 space-y-1">
                       <div class="text-xs opacity-50 mb-1.5">
                         <span x-text="ghFilteredReceiverArtifacts.length + '/' + ghReceiverRunArtifacts.length"></span> <span x-text="$t('gh.artifactsShown')"></span>
-                        <span class="text-warning ml-1" x-show="!isTauri && !ghProxyAvailable" x-text="'· ' + $t('gh.opensInTab')"></span>
+                        <span class="text-warning ml-1" x-show="!ghProxyAvailable" x-text="'· ' + $t('gh.opensInTab')"></span>
                       </div>
                       <div class="max-h-64 overflow-y-auto space-y-1 pr-0.5">
                         <template x-for="artifact in ghFilteredReceiverArtifacts" :key="artifact.name">

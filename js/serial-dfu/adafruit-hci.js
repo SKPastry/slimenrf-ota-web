@@ -137,7 +137,7 @@ export class AdafruitHciTransport {
       }
     } catch (err) {
       if (this._reading) {
-        this._log(`Read error: ${err instanceof Error ? err.message : String(err)}`);
+        this._log(`Read error: ${err.message}`);
       }
     }
   }

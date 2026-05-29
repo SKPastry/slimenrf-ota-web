@@ -1,6 +1,6 @@
 # SlimeNRF OTA Updater
 
-A firmware update tool for SlimeNRF trackers — works both as a **web app** (WebHID) and as a **native desktop app** (Tauri).
+A web-based firmware update tool for SlimeNRF trackers using WebHID.
 
 🌐 **Live:** [smol-ota.jtcat.com](https://smol-ota.jtcat.com)
 
@@ -13,61 +13,18 @@ A firmware update tool for SlimeNRF trackers — works both as a **web app** (We
 - 🔌 **Serial DFU** — receiver firmware updates via Adafruit or Nordic DFU bootloader
 - 🌍 **i18n** — English and Chinese translations
 - 🎨 **Dark/light theme** — DaisyUI-powered responsive UI
-- 🖥️ **Desktop app** — Tauri wrapper with native HID and Serial support
 
-## Browser Support (Web)
+## Browser Support
 
 WebHID requires a Chromium-based browser:
 - ✅ Chrome 89+ / Edge 89+ / Opera 75+
-- ❌ Firefox / Safari (use the desktop app instead)
-
-## Desktop App (Tauri)
-
-The Tauri build provides native HID and Serial access without browser restrictions.
-
-### Pre-built Packages
-
-| Format | Platform |
-|--------|----------|
-| `.deb` | Debian / Ubuntu |
-| `.rpm` | Fedora / openSUSE |
-| `.pkg.tar.zst` | Arch Linux |
-| `.AppImage` | Universal Linux |
-
-### Build from Source
-
-```bash
-# Prerequisites: rust, pnpm, nodejs, pkg-config
-# On Arch: pacman -S webkit2gtk-4.1 gtk3 hidapi
-
-pnpm install
-pnpm tauri:build
-```
-
-### Arch Linux (PKGBUILD)
-
-```bash
-cd src-tauri
-makepkg -si --skipchecksums
-```
-
-### Linux: udev Rules
-
-For HID/Serial access without root, install the udev rules:
-
-```bash
-sudo cp src-tauri/resources/99-slimenrf.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules
-```
-
-The `.deb` package installs these automatically.
+- ❌ Firefox / Safari (no WebHID support)
 
 ## Development
 
 ```bash
 pnpm install
-pnpm dev          # Vite dev server (web)
-pnpm tauri:dev    # Tauri dev mode (desktop)
+pnpm dev          # Vite dev server with HTTPS
 ```
 
 ### Deploy
@@ -81,9 +38,8 @@ pnpm deploy:staging   # Cloudflare Pages (staging)
 
 - **Alpine.js** — lightweight reactivity
 - **TailwindCSS v4 + DaisyUI v5** — styling
-- **Vite** — build tool
+- **Vite** — build tool (CSS only, no JS bundling)
 - **WebHID / Web Serial** — browser APIs for USB communication
-- **Tauri v2** — desktop wrapper with Rust backend (hidapi + serialport)
 
 ## Architecture
 
@@ -97,16 +53,8 @@ js/
 ├── crc32.js         CRC32 lookup-table implementation
 ├── github.js        GitHub release/CI artifact fetching
 ├── boardmap.js      Board target matching
-├── tauri-hid.js     WebHID polyfill for Tauri (native HID)
-├── tauri-serial.js  Web Serial polyfill for Tauri (native serial)
 ├── serial-dfu/      Serial DFU implementation (Adafruit + Nordic)
 └── i18n/            Translation files (en, zh-CN)
-
-src-tauri/
-├── src/lib.rs       Rust HID + Serial backend commands
-├── tauri.conf.json  App configuration
-├── PKGBUILD         Arch Linux package build script
-└── resources/       udev rules, bundled assets
 ```
 
 ## OTA Protocol

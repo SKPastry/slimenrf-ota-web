@@ -214,7 +214,7 @@ export class AdafruitDfu {
     } catch (err) {
       // If ACK was lost due to early USB disconnect, START was likely still processed.
       // Proceed with reconnection — if START wasn't received, INIT will fail clearly.
-      this._onLog(`START ACK interrupted (${err instanceof Error ? err.message : String(err)}), continuing...`);
+      this._onLog(`START ACK interrupted (${err.message}), continuing...`);
       startAckLost = true;
     }
 

@@ -71,13 +71,9 @@ export class OTASession {
     await this.device.sendReport(0x00, pkt);
   }
 
-  /** Send multiple packets in one call if device supports batching, else individual sends. */
+  /** Send multiple packets concurrently. */
   async _sendBatch(pkts) {
-    if (this.device.sendReportBatch) {
-      await this.device.sendReportBatch(0x00, pkts);
-    } else {
-      await Promise.all(pkts.map(p => this.device.sendReport(0x00, p)));
-    }
+    await Promise.all(pkts.map(p => this.device.sendReport(0x00, p)));
   }
 
   /** Collect OTA sub-reports matching `filter` until count or timeout. */

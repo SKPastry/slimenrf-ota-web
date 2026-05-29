@@ -4,32 +4,8 @@
 // - Artifacts: list via API (CORS OK), download via proxy or nightly.link
 // - Zip extraction via fflate
 // - When deployed on Cloudflare Pages, uses /api/proxy for CORS-free downloads
-// - In Tauri, uses @tauri-apps/plugin-http to bypass CORS
 
 import { unzipSync } from 'fflate';
-import { isTauri } from './tauri-hid.js';
-
-// Tauri HTTP fetch — bypasses CORS restrictions in native app
-let _tauriFetch = null;
-async function getTauriFetch() {
-  if (_tauriFetch) return _tauriFetch;
-  try {
-    const mod = await import('@tauri-apps/plugin-http');
-    _tauriFetch = mod.fetch;
-    return _tauriFetch;
-  } catch {
-    return null;
-  }
-}
-
-/** Pick the right fetch for the environment (Tauri plugin or browser native). */
-async function platformFetch(url, options) {
-  if (isTauri()) {
-    const f = await getTauriFetch();
-    if (f) return f(url, options);
-  }
-  return fetch(url, options);
-}
 
 // ── Configuration ────────────────────────────────────────────────────
 
@@ -61,12 +37,10 @@ function proxyUrl(url) {
 
 /**
  * Check if the CORS proxy is available (CF Pages deployment).
- * In Tauri, we use the HTTP plugin instead — no proxy needed.
  * Cached after first check.
  */
 let _proxyAvailable = null;
 export async function isProxyAvailable() {
-  if (isTauri()) return false; // Tauri uses plugin-http, no proxy needed
   if (_proxyAvailable !== null) return _proxyAvailable;
   try {
     const resp = await fetch('/api/proxy', { method: 'GET' });
@@ -86,7 +60,7 @@ export async function isProxyAvailable() {
  * Returns: [{ tag, name, date, prerelease, assets: [{ name, size, downloadUrl, type }] }]
  */
 export async function fetchReleases() {
-  const resp = await platformFetch(`${TRACKER_API_BASE}/releases?per_page=20`);
+  const resp = await fetch(`${TRACKER_API_BASE}/releases?per_page=20`);
   if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`);
   const data = await resp.json();
 
@@ -131,7 +105,7 @@ export async function fetchCIRuns() {
     status: 'success',
     per_page: '10',
   });
-  const resp = await platformFetch(`${TRACKER_API_BASE}/actions/runs?${params}`);
+  const resp = await fetch(`${TRACKER_API_BASE}/actions/runs?${params}`);
   if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`);
   const data = await resp.json();
 
@@ -153,7 +127,7 @@ export async function fetchCIRuns() {
  * Returns: [{ name, size, downloadUrl (nightly.link) }]
  */
 export async function fetchRunArtifacts(runId) {
-  const resp = await platformFetch(`${TRACKER_API_BASE}/actions/runs/${runId}/artifacts?per_page=100`);
+  const resp = await fetch(`${TRACKER_API_BASE}/actions/runs/${runId}/artifacts?per_page=100`);
   if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`);
   const data = await resp.json();
 
@@ -178,7 +152,7 @@ export async function fetchReceiverCIRuns() {
     status: 'success',
     per_page: '10',
   });
-  const resp = await platformFetch(`${RECEIVER_API_BASE}/actions/runs?${params}`);
+  const resp = await fetch(`${RECEIVER_API_BASE}/actions/runs?${params}`);
   if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`);
   const data = await resp.json();
 
@@ -199,7 +173,7 @@ export async function fetchReceiverCIRuns() {
  * Returns: [{ name, size, downloadUrl (nightly.link) }]
  */
 export async function fetchReceiverRunArtifacts(runId) {
-  const resp = await platformFetch(`${RECEIVER_API_BASE}/actions/runs/${runId}/artifacts?per_page=100`);
+  const resp = await fetch(`${RECEIVER_API_BASE}/actions/runs/${runId}/artifacts?per_page=100`);
   if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`);
   const data = await resp.json();
 
@@ -220,7 +194,7 @@ export async function fetchReceiverRunArtifacts(runId) {
  */
 async function fetchWithProgress(url, onProgress, useProxy = false) {
   const fetchUrl = useProxy ? proxyUrl(url) : url;
-  const resp = await platformFetch(fetchUrl, { redirect: 'follow' });
+  const resp = await fetch(fetchUrl, { redirect: 'follow' });
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
   const total = parseInt(resp.headers.get('content-length') || '0', 10);
