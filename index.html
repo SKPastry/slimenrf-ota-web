@@ -717,6 +717,9 @@
                       <template x-if="fw.detectedBoard">
                         <span class="badge badge-info badge-xs font-mono shrink-0" x-text="fw.detectedBoard"></span>
                       </template>
+                      <template x-if="fw.sdPlusApp">
+                        <span class="badge badge-warning badge-xs shrink-0">SD+App</span>
+                      </template>
                     </div>
                     <div class="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] opacity-50 mt-0.5 pl-6">
                       <span x-text="(fw.parsed.data.length / 1024).toFixed(1) + ' KB'"></span>
