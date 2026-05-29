@@ -976,7 +976,7 @@ Alpine.data('otaApp', () => ({
           }
         }
 
-        const mp = bt.includes('nrf52833') ? 1 : 2;
+        const mp = bt.includes('nrf52840') ? 2 : 1;
         for (let i = 0; i < group.tids.length; i += mp) {
           plan.push({ boardTarget: bt, ids: group.tids.slice(i, i + mp), firmware: fw });
         }

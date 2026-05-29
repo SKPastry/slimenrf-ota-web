@@ -1,78 +1,118 @@
-# SlimeNRF OTA Web Updater
+# SlimeNRF OTA Updater
 
-A browser-based firmware update tool for SlimeNRF trackers using the **WebHID API**. No backend, no installation — just open the page and update.
+A firmware update tool for SlimeNRF trackers — works both as a **web app** (WebHID) and as a **native desktop app** (Tauri).
+
+🌐 **Live:** [smol-ota.jtcat.com](https://smol-ota.jtcat.com)
 
 ## Features
 
-- 🌐 **Pure web** — runs entirely in the browser via WebHID
 - 📡 **Auto-discovery** — scans connected receivers and enumerates trackers
-- 📦 **UF2 parsing** — drag & drop `.uf2` firmware files
-- ⚡ **Parallel OTA** — batch updates with flow-controlled streaming
+- ⚡ **Parallel OTA** — batch updates with flow-controlled streaming (2 trackers at a time)
+- 📦 **UF2 / HEX parsing** — drag & drop firmware files
 - 🔒 **CRC32 verification** — validates firmware integrity before activation
-- 🎨 **Dark/light theme** — DaisyUI-powered UI
+- 🔌 **Serial DFU** — receiver firmware updates via Adafruit or Nordic DFU bootloader
+- 🌍 **i18n** — English and Chinese translations
+- 🎨 **Dark/light theme** — DaisyUI-powered responsive UI
+- 🖥️ **Desktop app** — Tauri wrapper with native HID and Serial support
 
-## Browser Support
+## Browser Support (Web)
 
 WebHID requires a Chromium-based browser:
-- ✅ Chrome 89+
-- ✅ Edge 89+
-- ✅ Opera 75+
-- ❌ Firefox (not supported)
-- ❌ Safari (not supported)
+- ✅ Chrome 89+ / Edge 89+ / Opera 75+
+- ❌ Firefox / Safari (use the desktop app instead)
 
-## Quick Start
+## Desktop App (Tauri)
+
+The Tauri build provides native HID and Serial access without browser restrictions.
+
+### Pre-built Packages
+
+| Format | Platform |
+|--------|----------|
+| `.deb` | Debian / Ubuntu |
+| `.rpm` | Fedora / openSUSE |
+| `.pkg.tar.zst` | Arch Linux |
+| `.AppImage` | Universal Linux |
+
+### Build from Source
 
 ```bash
-cd slimevr-ota-web
-npm install
-npm run dev
+# Prerequisites: rust, pnpm, nodejs, pkg-config
+# On Arch: pacman -S webkit2gtk-4.1 gtk3 hidapi
+
+pnpm install
+pnpm tauri:build
 ```
 
-Then open `http://localhost:5173` in Chrome/Edge.
-
-### No dev server? Just serve static files:
+### Arch Linux (PKGBUILD)
 
 ```bash
-npx serve .
-# or
-python -m http.server 8000
+cd src-tauri
+makepkg -si --skipchecksums
 ```
 
-> **Note:** WebHID works on `localhost` without HTTPS. For remote access, HTTPS is required.
+### Linux: udev Rules
 
-## Usage
+For HID/Serial access without root, install the udev rules:
 
-1. Click **Connect** — the browser will show a device picker for SlimeNRF receivers
-2. Trackers are scanned automatically — online trackers show firmware info
-3. **Drag & drop** a `.uf2` firmware file (or click Choose File)
-4. **Select trackers** to update by clicking their cards
-5. Click **Start Update** — the tool will:
-   - Send BEGIN to selected trackers
-   - Stream firmware data with flow control
-   - Verify CRC32 integrity
-   - Activate new firmware (trackers reboot automatically)
+```bash
+sudo cp src-tauri/resources/99-slimenrf.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules
+```
+
+The `.deb` package installs these automatically.
+
+## Development
+
+```bash
+pnpm install
+pnpm dev          # Vite dev server (web)
+pnpm tauri:dev    # Tauri dev mode (desktop)
+```
+
+### Deploy
+
+```bash
+pnpm deploy:prod      # Cloudflare Pages (production)
+pnpm deploy:staging   # Cloudflare Pages (staging)
+```
 
 ## Tech Stack
 
-- **Alpine.js** — lightweight reactivity (ESM, no build)
-- **TailwindCSS + DaisyUI** — styling via CDN
-- **WebHID API** — direct USB HID communication
-- **Vite** — dev server only (no transformation)
-- **ESM + Import Maps** — native browser modules, zero build step
+- **Alpine.js** — lightweight reactivity
+- **TailwindCSS v4 + DaisyUI v5** — styling
+- **Vite** — build tool
+- **WebHID / Web Serial** — browser APIs for USB communication
+- **Tauri v2** — desktop wrapper with Rust backend (hidapi + serialport)
 
 ## Architecture
 
 ```
 js/
-├── crc32.js         CRC32 lookup-table implementation
-├── uf2.js           UF2 binary parser
-├── protocol.js      OTA protocol constants & packet helpers
+├── app.js           Alpine.js application & UI state
 ├── ota.js           OTA session manager (WebHID + flow control)
-└── app.js           Alpine.js application & UI state
+├── protocol.js      OTA protocol constants & packet helpers
+├── uf2.js           UF2 binary parser
+├── hex.js           Intel HEX parser
+├── crc32.js         CRC32 lookup-table implementation
+├── github.js        GitHub release/CI artifact fetching
+├── boardmap.js      Board target matching
+├── tauri-hid.js     WebHID polyfill for Tauri (native HID)
+├── tauri-serial.js  Web Serial polyfill for Tauri (native serial)
+├── serial-dfu/      Serial DFU implementation (Adafruit + Nordic)
+└── i18n/            Translation files (en, zh-CN)
+
+src-tauri/
+├── src/lib.rs       Rust HID + Serial backend commands
+├── tauri.conf.json  App configuration
+├── PKGBUILD         Arch Linux package build script
+└── resources/       udev rules, bundled assets
 ```
 
-The OTA protocol is a direct port of `esb_ota.py` to WebHID:
+## OTA Protocol
+
+Direct port of `esb_ota.py` to WebHID:
 - **VID** `0x1209` / **PID** `0x7690`
 - 64-byte HID reports with 4 × 16-byte sub-report packing
 - Flow-controlled streaming with ring buffer backpressure (max 239 in-flight)
-- Batch parallel updates (2 trackers for nRF52840, 1 for nRF52833)
+- Batch parallel updates grouped by board target (2 parallel for nRF52840, 1 for others)
