@@ -61,14 +61,15 @@ function proxyUrl(url) {
 
 /**
  * Check if the CORS proxy is available (CF Pages deployment).
+ * In Tauri, we use the HTTP plugin instead — no proxy needed.
  * Cached after first check.
  */
 let _proxyAvailable = null;
 export async function isProxyAvailable() {
+  if (isTauri()) return false; // Tauri uses plugin-http, no proxy needed
   if (_proxyAvailable !== null) return _proxyAvailable;
   try {
     const resp = await fetch('/api/proxy', { method: 'GET' });
-    // Health-check returns 200 with { status: 'ok' }
     _proxyAvailable = resp.ok;
   } catch {
     _proxyAvailable = false;
