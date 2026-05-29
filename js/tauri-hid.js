@@ -108,6 +108,8 @@ class TauriHID extends EventTarget {
   constructor() {
     super();
     this._openedDevices = new Map(); // path → TauriHIDDevice
+    this._knownPaths = new Set(); // track known device paths for connect detection
+    this._pollTimer = null;
   }
 
   /**
@@ -119,8 +121,10 @@ class TauriHID extends EventTarget {
     // Track devices for getDevices()
     for (const d of devices) {
       this._openedDevices.set(d._path, d);
+      this._knownPaths.add(d._path);
       d._onDisconnect = (dev) => this._handleDisconnect(dev);
     }
+    this._startPolling();
     return devices;
   }
 
@@ -138,6 +142,7 @@ class TauriHID extends EventTarget {
     for (const d of devices) {
       if (!this._openedDevices.has(d._path)) {
         this._openedDevices.set(d._path, d);
+        this._knownPaths.add(d._path);
         d._onDisconnect = (dev) => this._handleDisconnect(dev);
       }
     }
@@ -168,9 +173,35 @@ class TauriHID extends EventTarget {
   /** Handle device disconnection — emit 'disconnect' event (matches WebHID spec). */
   _handleDisconnect(device) {
     this._openedDevices.delete(device._path);
+    this._knownPaths.delete(device._path);
     const event = new Event('disconnect');
     event.device = device;
     this.dispatchEvent(event);
+  }
+
+  /** Poll for newly connected devices and emit 'connect' events. */
+  _startPolling() {
+    if (this._pollTimer) return;
+    this._pollTimer = setInterval(async () => {
+      try {
+        const devices = await this._listMatchingDevices([]);
+        for (const d of devices) {
+          if (!this._knownPaths.has(d._path)) {
+            this._knownPaths.add(d._path);
+            this._openedDevices.set(d._path, d);
+            d._onDisconnect = (dev) => this._handleDisconnect(dev);
+            const event = new Event('connect');
+            event.device = d;
+            this.dispatchEvent(event);
+          }
+        }
+        // Clean stale paths
+        const currentPaths = new Set(devices.map(d => d._path));
+        for (const path of this._knownPaths) {
+          if (!currentPaths.has(path)) this._knownPaths.delete(path);
+        }
+      } catch { /* ignore polling errors */ }
+    }, 3000);
   }
 }
 

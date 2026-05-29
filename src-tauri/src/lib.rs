@@ -165,17 +165,16 @@ fn hid_open_device(
 
 #[tauri::command]
 fn hid_close_device(path: String, state: tauri::State<'_, Mutex<HidState>>) -> Result<(), String> {
-    let mut state = state.lock();
-
-    if let Some(mut open_dev) = state.devices.remove(&path) {
-        open_dev.stop_flag.store(true, Ordering::Relaxed);
-        if let Some(handle) = open_dev.reader_handle.take() {
-            let _ = handle.join();
-        }
-        Ok(())
-    } else {
-        Err("Device not open".into())
+    let mut open_dev = {
+        let mut state = state.lock();
+        state.devices.remove(&path).ok_or("Device not open")?
+    };
+    // Mutex released before join to avoid blocking other commands
+    open_dev.stop_flag.store(true, Ordering::Relaxed);
+    if let Some(handle) = open_dev.reader_handle.take() {
+        let _ = handle.join();
     }
+    Ok(())
 }
 
 #[tauri::command]
@@ -373,17 +372,16 @@ fn serial_close(
     path: String,
     state: tauri::State<'_, Mutex<SerialState>>,
 ) -> Result<(), String> {
-    let mut state = state.lock();
-
-    if let Some(mut open_port) = state.ports.remove(&path) {
-        open_port.stop_flag.store(true, Ordering::Relaxed);
-        if let Some(handle) = open_port.reader_handle.take() {
-            let _ = handle.join();
-        }
-        Ok(())
-    } else {
-        Err("Port not open".into())
+    let mut open_port = {
+        let mut state = state.lock();
+        state.ports.remove(&path).ok_or("Port not open")?
+    };
+    // Mutex released before join to avoid blocking other commands
+    open_port.stop_flag.store(true, Ordering::Relaxed);
+    if let Some(handle) = open_port.reader_handle.take() {
+        let _ = handle.join();
     }
+    Ok(())
 }
 
 #[tauri::command]
