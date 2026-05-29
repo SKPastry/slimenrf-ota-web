@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.0",
+    "@tauri-apps/plugin-http": "^2.5.9",
     "alpinejs": "^3.15.12",
     "fflate": "^0.8.3"
   }

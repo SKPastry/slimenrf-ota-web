@@ -55,7 +55,9 @@ fn hid_list_devices(
     let devices: Vec<DeviceInfo> = state
         .api
         .device_list()
-        .filter(|d| d.vendor_id() == vid && d.product_id() == pid)
+        .filter(|d| {
+            (vid == 0 || d.vendor_id() == vid) && (pid == 0 || d.product_id() == pid)
+        })
         .map(|d| DeviceInfo {
             path: d.path().to_string_lossy().into_owned(),
             vendor_id: d.vendor_id(),
@@ -418,6 +420,7 @@ pub fn run() {
         .manage(Mutex::new(SerialState {
             ports: HashMap::new(),
         }))
+        .plugin(tauri_plugin_http::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(

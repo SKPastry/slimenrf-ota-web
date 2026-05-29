@@ -1,5 +1,4 @@
 // SlimeNRF OTA Web Updater — Alpine.js application
-// No build step: runs directly as ESM in the browser.
 
 import Alpine from 'alpinejs';
 import { OTASession } from './ota.js';
@@ -20,6 +19,13 @@ import { installTauriSerial } from './tauri-serial.js';
 if (isTauri()) {
   installTauriHID();
   installTauriSerial();
+}
+
+/** Extract error message from Error objects or Tauri string rejections. */
+function errMsg(e) {
+  if (e instanceof Error) return e.message;
+  if (typeof e === 'string') return e;
+  return String(e);
 }
 
 // ── Alpine.js Component ─────────────────────────────────────────────
@@ -396,7 +402,7 @@ Alpine.data('otaApp', () => ({
     try {
       await this._openDevice(target);
     } catch (e) {
-      console.warn('[AutoConnect]', e.message);
+      console.warn('[AutoConnect]', errMsg(e));
     } finally {
       this.connecting = false;
     }
@@ -410,7 +416,7 @@ Alpine.data('otaApp', () => ({
     try {
       await this._openDevice(device);
     } catch (e) {
-      this.log(`✗ Connection failed: ${e.message}`);
+      this.log(`✗ Connection failed: ${errMsg(e)}`);
     } finally {
       this.connecting = false;
     }
@@ -429,7 +435,7 @@ Alpine.data('otaApp', () => ({
       await this._openDevice(device);
     } catch (e) {
       if (e.name !== 'NotAllowedError') {
-        this.log(`✗ Connection failed: ${e.message}`);
+        this.log(`✗ Connection failed: ${errMsg(e)}`);
       }
     } finally {
       this.connecting = false;
@@ -659,7 +665,7 @@ Alpine.data('otaApp', () => ({
         }
       }
     } catch (e) {
-      this.log(`✗ Scan failed: ${e.message}`);
+      this.log(`✗ Scan failed: ${errMsg(e)}`);
     } finally {
       this.scanning = false;
       this._autoMapFirmware();
@@ -688,7 +694,7 @@ Alpine.data('otaApp', () => ({
         this.log(`Tracker ${tid}: no OTA response (may not support OTA)`);
       }
     } catch (e) {
-      this.log(`✗ Refresh tracker ${tid} failed: ${e.message}`);
+      this.log(`✗ Refresh tracker ${tid} failed: ${errMsg(e)}`);
     } finally {
       this.queryingTrackers = { ...this.queryingTrackers, [tid]: false };
     }
@@ -768,7 +774,7 @@ Alpine.data('otaApp', () => ({
       this._autoMapFirmware();
       this._syncFirmwareStore();
     } catch (e) {
-      this.log(`✗ Firmware parse error (${file.name}): ${e.message}`);
+      this.log(`✗ Firmware parse error (${file.name}): ${errMsg(e)}`);
     }
   },
 
@@ -782,7 +788,7 @@ Alpine.data('otaApp', () => ({
       }
       this.log(`✓ Extracted ${uf2Files.length} firmware(s) from ${file.name}`);
     } catch (e) {
-      this.log(`✗ Zip extraction error (${file.name}): ${e.message}`);
+      this.log(`✗ Zip extraction error (${file.name}): ${errMsg(e)}`);
     }
   },
 
@@ -905,7 +911,7 @@ Alpine.data('otaApp', () => ({
           fw.parsed = this._parseFirmware(fw.raw, fw.file.name, base);
           this.log(`Re-parsed ${fw.file.name} for flash base 0x${base.toString(16).padStart(8, '0')}`);
         } catch (e) {
-          this.log(`⚠ Cannot re-parse ${fw.file.name}: ${e.message}`);
+          this.log(`⚠ Cannot re-parse ${fw.file.name}: ${errMsg(e)}`);
         }
       }
     }
@@ -971,7 +977,7 @@ Alpine.data('otaApp', () => ({
             fwEntry.parsed = fw;
             this.log(`Re-parsed: ${(fw.data.length / 1024).toFixed(1)} KB at 0x${fw.baseAddress.toString(16).padStart(8, '0')}`);
           } catch (e) {
-            this.log(`✗ Cannot re-parse firmware: ${e.message}. Skipping board target ${bt}.`);
+            this.log(`✗ Cannot re-parse firmware: ${errMsg(e)}. Skipping board target ${bt}.`);
             continue;
           }
         }
@@ -1036,10 +1042,10 @@ Alpine.data('otaApp', () => ({
       }
 
     } catch (e) {
-      if (e.message === 'Aborted') {
+      if (errMsg(e) === 'Aborted') {
         this.log('Update aborted.');
       } else {
-        this.log(`✗ Update error: ${e.message}`);
+        this.log(`✗ Update error: ${errMsg(e)}`);
       }
       this.updateSuccess = false;
       this._activeFirmware = null;
@@ -1089,7 +1095,7 @@ Alpine.data('otaApp', () => ({
       }
     } catch (e) {
       this.receiverInfoQueried = true;
-      this.log(`✗ Receiver info query error: ${e.message}`);
+      this.log(`✗ Receiver info query error: ${errMsg(e)}`);
     } finally {
       this.queryingReceiver = false;
     }
@@ -1137,7 +1143,7 @@ Alpine.data('otaApp', () => ({
       if (e.name === 'NotFoundError') {
         // User cancelled the port picker
       } else {
-        this.log(`✗ DFU command error: ${e.message}`);
+        this.log(`✗ DFU command error: ${errMsg(e)}`);
       }
     } finally {
       try { if (port?.readable) await port.close(); } catch {}
@@ -1169,7 +1175,7 @@ Alpine.data('otaApp', () => ({
       try {
         fw = this._parseFirmware(fwEntry.raw, fwEntry.file.name, this.receiverInfo.flashBase);
       } catch (e) {
-        this.log(`✗ Cannot re-parse receiver firmware: ${e.message}`);
+        this.log(`✗ Cannot re-parse receiver firmware: ${errMsg(e)}`);
         return false;
       }
     }
@@ -1187,7 +1193,7 @@ Alpine.data('otaApp', () => ({
       }
       return ok;
     } catch (e) {
-      this.log(`✗ Receiver OTA error: ${e.message}`);
+      this.log(`✗ Receiver OTA error: ${errMsg(e)}`);
       return false;
     } finally {
       this.receiverUpdating = false;
@@ -1234,7 +1240,7 @@ Alpine.data('otaApp', () => ({
         this._updateDismissTimer = setTimeout(() => { this.updateSuccess = null; }, 8000);
       }
     } catch (e) {
-      this.log(`✗ Receiver OTA error: ${e.message}`);
+      this.log(`✗ Receiver OTA error: ${errMsg(e)}`);
       this.updateSuccess = false;
     } finally {
       this.updating = false;
@@ -1256,7 +1262,7 @@ Alpine.data('otaApp', () => ({
       }
       this.log(`Loaded ${this.ghReleases.length} release(s) from GitHub`);
     } catch (e) {
-      this.log(`✗ Failed to load releases: ${e.message}`);
+      this.log(`✗ Failed to load releases: ${errMsg(e)}`);
     } finally {
       this.ghLoading = false;
     }
@@ -1269,7 +1275,7 @@ Alpine.data('otaApp', () => ({
       this.ghCIRuns = await fetchCIRuns();
       this.log(`Loaded ${this.ghCIRuns.length} tracker CI run(s) from GitHub`);
     } catch (e) {
-      this.log(`✗ Failed to load tracker CI runs: ${e.message}`);
+      this.log(`✗ Failed to load tracker CI runs: ${errMsg(e)}`);
     } finally {
       this.ghLoading = false;
     }
@@ -1282,7 +1288,7 @@ Alpine.data('otaApp', () => ({
       this.ghReceiverCIRuns = await fetchReceiverCIRuns();
       this.log(`Loaded ${this.ghReceiverCIRuns.length} receiver CI run(s) from GitHub`);
     } catch (e) {
-      this.log(`✗ Failed to load receiver CI runs: ${e.message}`);
+      this.log(`✗ Failed to load receiver CI runs: ${errMsg(e)}`);
     } finally {
       this.ghLoading = false;
     }
@@ -1295,7 +1301,7 @@ Alpine.data('otaApp', () => ({
     try {
       this.ghRunArtifacts = await fetchRunArtifacts(runId);
     } catch (e) {
-      this.log(`✗ Failed to load artifacts: ${e.message}`);
+      this.log(`✗ Failed to load artifacts: ${errMsg(e)}`);
     } finally {
       this.ghArtifactsLoading = false;
     }
@@ -1308,7 +1314,7 @@ Alpine.data('otaApp', () => ({
     try {
       this.ghReceiverRunArtifacts = await fetchReceiverRunArtifacts(runId);
     } catch (e) {
-      this.log(`✗ Failed to load receiver artifacts: ${e.message}`);
+      this.log(`✗ Failed to load receiver artifacts: ${errMsg(e)}`);
     } finally {
       this.ghArtifactsLoading = false;
     }
@@ -1440,8 +1446,8 @@ Alpine.data('otaApp', () => ({
         this.log(`Opening download link for ${asset.name} (CORS restricted, use drag-and-drop to load)`);
       }
     } catch (e) {
-      this.ghDownloading = { ...this.ghDownloading, [key]: { progress: 0, error: e.message } };
-      this.log(`✗ Download error (${asset.name}): ${e.message}`);
+      this.ghDownloading = { ...this.ghDownloading, [key]: { progress: 0, error: errMsg(e) } };
+      this.log(`✗ Download error (${asset.name}): ${errMsg(e)}`);
     }
   },
 
@@ -1468,8 +1474,8 @@ Alpine.data('otaApp', () => ({
         this.log(`Opening download link for ${artifact.name} (CORS restricted, drop .zip file to load)`);
       }
     } catch (e) {
-      this.ghDownloading = { ...this.ghDownloading, [key]: { progress: 0, error: e.message } };
-      this.log(`✗ Artifact download error (${artifact.name}): ${e.message}`);
+      this.ghDownloading = { ...this.ghDownloading, [key]: { progress: 0, error: errMsg(e) } };
+      this.log(`✗ Artifact download error (${artifact.name}): ${errMsg(e)}`);
     }
   },
 
@@ -1497,7 +1503,7 @@ Alpine.data('otaApp', () => ({
       this._autoMapFirmware();
       this._syncFirmwareStore();
     } catch (e) {
-      this.log(`✗ Firmware parse error (${name}): ${e.message}`);
+      this.log(`✗ Firmware parse error (${name}): ${errMsg(e)}`);
     }
   },
 
@@ -1547,8 +1553,8 @@ Alpine.data('otaApp', () => ({
         this.ghDownloading = { ...this.ghDownloading, [key]: { progress: 0, error: null, fallback: true } };
       }
     } catch (e) {
-      this.ghDownloading = { ...this.ghDownloading, [key]: { progress: 0, error: e.message } };
-      this.log(`✗ Save error (${artifact.name}): ${e.message}`);
+      this.ghDownloading = { ...this.ghDownloading, [key]: { progress: 0, error: errMsg(e) } };
+      this.log(`✗ Save error (${artifact.name}): ${errMsg(e)}`);
     }
   },
 }));
