@@ -23,6 +23,12 @@ const MIN_RELEASE_TAG = 260527;
 const MIN_RUN_NUMBER = 191;
 // Only show receiver CI runs with run_number ≥ this value
 const MIN_RECEIVER_RUN_NUMBER = 68;
+const CI_PRIMARY_BRANCH = 'dev';
+const CI_RUN_LIST_LIMIT = 10;
+const CI_RUN_SOURCES = [
+  { branch: CI_PRIMARY_BRANCH, event: 'push' },
+  { branch: CI_PRIMARY_BRANCH, event: 'workflow_dispatch' },
+];
 
 // ── Proxy Detection ─────────────────────────────────────────────────
 
@@ -94,23 +100,32 @@ export async function fetchReleases() {
 
 // ── CI Runs API ──────────────────────────────────────────────────────
 
-/**
- * Fetch successful tracker CI runs from dev branch (push events).
- * Returns: [{ id, number, title, date, sha, branch }]
- */
-export async function fetchCIRuns() {
-  const params = new URLSearchParams({
-    branch: 'dev',
-    event: 'push',
-    status: 'success',
-    per_page: '10',
-  });
-  const resp = await fetch(`${TRACKER_API_BASE}/actions/runs?${params}`);
-  if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`);
-  const data = await resp.json();
+async function fetchSuccessfulCIRuns(apiBase, minRunNumber) {
+  const runLists = await Promise.all(
+    CI_RUN_SOURCES.map(async ({ branch, event }) => {
+      const params = new URLSearchParams({
+        branch,
+        event,
+        status: 'success',
+        per_page: String(CI_RUN_LIST_LIMIT),
+      });
+      const resp = await fetch(`${apiBase}/actions/runs?${params}`);
+      if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`);
+      const data = await resp.json();
+      return data.workflow_runs || [];
+    })
+  );
 
-  return data.workflow_runs
-    .filter((r) => r.run_number >= MIN_RUN_NUMBER)
+  const seen = new Set();
+  return runLists
+    .flat()
+    .filter((r) => {
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return r.run_number >= minRunNumber;
+    })
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, CI_RUN_LIST_LIMIT)
     .map((r) => ({
       id: r.id,
       number: r.run_number,
@@ -119,6 +134,15 @@ export async function fetchCIRuns() {
       sha: r.head_sha.slice(0, 8),
       branch: r.head_branch,
     }));
+}
+
+/**
+ * Fetch successful tracker CI runs from the primary branch.
+ * Includes automated push builds and manually dispatched workflow runs.
+ * Returns: [{ id, number, title, date, sha, branch }]
+ */
+export async function fetchCIRuns() {
+  return fetchSuccessfulCIRuns(TRACKER_API_BASE, MIN_RUN_NUMBER);
 }
 
 /**
@@ -142,30 +166,12 @@ export async function fetchRunArtifacts(runId) {
 }
 
 /**
- * Fetch successful receiver CI runs from dev branch (push events).
+ * Fetch successful receiver CI runs from the primary branch.
+ * Includes automated push builds and manually dispatched workflow runs.
  * Returns: [{ id, number, title, date, sha, branch }]
  */
 export async function fetchReceiverCIRuns() {
-  const params = new URLSearchParams({
-    branch: 'dev',
-    event: 'push',
-    status: 'success',
-    per_page: '10',
-  });
-  const resp = await fetch(`${RECEIVER_API_BASE}/actions/runs?${params}`);
-  if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`);
-  const data = await resp.json();
-
-  return data.workflow_runs
-    .filter((r) => r.run_number >= MIN_RECEIVER_RUN_NUMBER)
-    .map((r) => ({
-      id: r.id,
-      number: r.run_number,
-      title: r.display_title,
-      date: r.created_at,
-      sha: r.head_sha.slice(0, 8),
-      branch: r.head_branch,
-    }));
+  return fetchSuccessfulCIRuns(RECEIVER_API_BASE, MIN_RECEIVER_RUN_NUMBER);
 }
 
 /**
