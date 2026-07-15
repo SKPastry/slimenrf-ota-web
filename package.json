@@ -2,6 +2,17 @@
   "name": "slimenrf-ota-web",
   "version": "1.0.0",
   "description": "SlimeNRF OTA Firmware Update Tool (WebHID)",
+  "private": true,
+  "license": "MIT",
+  "author": "Jiting",
+  "homepage": "https://smol-ota.jtcat.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jitingcn/slimenrf-ota-web.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jitingcn/slimenrf-ota-web/issues"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite --open",

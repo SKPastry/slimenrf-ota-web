@@ -4,6 +4,19 @@ A web-based firmware update tool for SlimeNRF trackers using WebHID.
 
 🌐 **Live:** [smol-ota.jtcat.com](https://smol-ota.jtcat.com)
 
+## Firmware Compatibility
+
+This tool is designed specifically for the
+[SlimeNRF tracker firmware](https://github.com/jitingcn/SlimeVR-Tracker-nRF)
+and
+[SlimeNRF receiver firmware](https://github.com/jitingcn/SlimeVR-Tracker-nRF-Receiver)
+maintained by `jitingcn`.
+
+> [!WARNING]
+> The OTA protocol is specific to the current SlimeNRF implementation. It is
+> **not compatible with the official upstream SlimeVR firmware or its OTA
+> implementation**. Do not use this updater with upstream SlimeVR devices.
+
 ## Features
 
 - 📡 **Auto-discovery** — scans connected receivers and enumerates trackers
@@ -38,7 +51,7 @@ pnpm deploy:staging   # Cloudflare Pages (staging)
 
 - **Alpine.js** — lightweight reactivity
 - **TailwindCSS v4 + DaisyUI v5** — styling
-- **Vite** — build tool (CSS only, no JS bundling)
+- **Vite** — development server and production bundler
 - **WebHID / Web Serial** — browser APIs for USB communication
 
 ## Architecture
@@ -64,3 +77,21 @@ Direct port of `esb_ota.py` to WebHID:
 - 64-byte HID reports with 4 × 16-byte sub-report packing
 - Flow-controlled streaming with ring buffer backpressure (max 239 in-flight)
 - Batch parallel updates grouped by board target (2 parallel for nRF52840, 1 for others)
+
+## Contributing
+
+Issues and pull requests are welcome. Before submitting a change, install the
+dependencies and confirm that the production build succeeds:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm build
+```
+
+Changes to visible text should update both `js/i18n/en.js` and
+`js/i18n/zh-CN.js`. Changes to OTA protocol behavior should be checked against
+the matching tracker and receiver firmware implementations.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
