@@ -4,7 +4,7 @@ import Alpine from 'alpinejs';
 import { OTASession } from './ota.js';
 import { parseUF2 } from './uf2.js';
 import { parseHex } from './hex.js';
-import { VID, PID, OTA_DATA_MAX_PAYLOAD, RECEIVER_OTA_ID } from './protocol.js';
+import { buildAbort, VID, PID, OTA_DATA_MAX_PAYLOAD, RECEIVER_OTA_ID } from './protocol.js';
 import { matchBoardTarget, matchReceiverBoardTarget, refreshOnlineMaps } from './boardmap.js';
 import {
   fetchReleases, fetchCIRuns, fetchRunArtifacts,
@@ -1114,7 +1114,7 @@ Alpine.data('otaApp', () => ({
       }
       this.updateSuccess = false;
       this._activeFirmware = null;
-      try { await this._session._send((await import('./protocol.js')).buildAbort(0xff)); } catch {}
+      try { await this._session._send(buildAbort(0xff)); } catch {}
     } finally {
       this.updating = false;
       this.receiverUpdating = false;
