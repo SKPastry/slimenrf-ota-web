@@ -13,9 +13,9 @@ and
 maintained by `jitingcn`.
 
 > [!WARNING]
-> The OTA protocol is specific to the current SlimeNRF implementation. It is
+> The OTA protocol is specific to the current SlimeNRF implementation. It may
 > **not compatible with the official upstream SlimeVR firmware or its OTA
-> implementation**. Do not use this updater with upstream SlimeVR devices.
+> implementation**.
 
 ## Features
 
