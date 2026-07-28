@@ -9,26 +9,23 @@ import { unzipSync } from 'fflate';
 
 // ── Configuration ────────────────────────────────────────────────────
 
-const OWNER = 'jitingcn';
+const TRACKER_OWNER = 'SKPastry';
+const RECEIVER_OWNER = 'SKPastry';
 const TRACKER_REPO = 'SlimeVR-Tracker-nRF';
 const RECEIVER_REPO = 'SlimeVR-Tracker-nRF-Receiver';
-const TRACKER_API_BASE = `https://api.github.com/repos/${OWNER}/${TRACKER_REPO}`;
-const RECEIVER_API_BASE = `https://api.github.com/repos/${OWNER}/${RECEIVER_REPO}`;
-const TRACKER_NIGHTLY_LINK = `https://nightly.link/${OWNER}/${TRACKER_REPO}`;
-const RECEIVER_NIGHTLY_LINK = `https://nightly.link/${OWNER}/${RECEIVER_REPO}`;
+const TRACKER_BRANCH = 'devc';
+const RECEIVER_BRANCH = 'devc';
+const TRACKER_API_BASE = `https://api.github.com/repos/${TRACKER_OWNER}/${TRACKER_REPO}`;
+const RECEIVER_API_BASE = `https://api.github.com/repos/${RECEIVER_OWNER}/${RECEIVER_REPO}`;
+const TRACKER_NIGHTLY_LINK = `https://nightly.link/${TRACKER_OWNER}/${TRACKER_REPO}`;
+const RECEIVER_NIGHTLY_LINK = `https://nightly.link/${RECEIVER_OWNER}/${RECEIVER_REPO}`;
 
-// Only show releases with tags that are numeric and ≥ this value (OTA-compatible)
-const MIN_RELEASE_TAG = 260527;
 // Only show tracker CI runs with run_number ≥ this value
-const MIN_RUN_NUMBER = 191;
+const MIN_RUN_NUMBER = 1;
 // Only show receiver CI runs with run_number ≥ this value
-const MIN_RECEIVER_RUN_NUMBER = 68;
-const CI_PRIMARY_BRANCH = 'dev';
+const MIN_RECEIVER_RUN_NUMBER = 1;
 const CI_RUN_LIST_LIMIT = 10;
-const CI_RUN_SOURCES = [
-  { branch: CI_PRIMARY_BRANCH, event: 'push' },
-  { branch: CI_PRIMARY_BRANCH, event: 'workflow_dispatch' },
-];
+const CI_RUN_EVENTS = ['push', 'workflow_dispatch'];
 
 // ── Proxy Detection ─────────────────────────────────────────────────
 
@@ -61,7 +58,7 @@ export async function isProxyAvailable() {
 
 /**
  * Fetch releases from GitHub API.
- * Filters to releases with numeric tags ≥ MIN_RELEASE_TAG.
+ * Keeps all published releases from the configured tracker repository.
  * Returns both tracker and receiver assets, tagged with `type`.
  * Returns: [{ tag, name, date, prerelease, assets: [{ name, size, downloadUrl, type }] }]
  */
@@ -71,12 +68,7 @@ export async function fetchReleases() {
   const data = await resp.json();
 
   return data
-    .filter((r) => {
-      const m = r.tag_name.match(/^(\d{6})/);
-      if (!m) return false;
-      const tag = parseInt(m[1], 10);
-      return tag >= MIN_RELEASE_TAG;
-    })
+    .filter((r) => !r.draft)
     .map((r) => ({
       tag: r.tag_name,
       name: r.name || r.tag_name,
@@ -100,9 +92,9 @@ export async function fetchReleases() {
 
 // ── CI Runs API ──────────────────────────────────────────────────────
 
-async function fetchSuccessfulCIRuns(apiBase, minRunNumber) {
+async function fetchSuccessfulCIRuns(apiBase, branch, minRunNumber) {
   const runLists = await Promise.all(
-    CI_RUN_SOURCES.map(async ({ branch, event }) => {
+    CI_RUN_EVENTS.map(async (event) => {
       const params = new URLSearchParams({
         branch,
         event,
@@ -142,7 +134,7 @@ async function fetchSuccessfulCIRuns(apiBase, minRunNumber) {
  * Returns: [{ id, number, title, date, sha, branch }]
  */
 export async function fetchCIRuns() {
-  return fetchSuccessfulCIRuns(TRACKER_API_BASE, MIN_RUN_NUMBER);
+  return fetchSuccessfulCIRuns(TRACKER_API_BASE, TRACKER_BRANCH, MIN_RUN_NUMBER);
 }
 
 /**
@@ -171,7 +163,7 @@ export async function fetchRunArtifacts(runId) {
  * Returns: [{ id, number, title, date, sha, branch }]
  */
 export async function fetchReceiverCIRuns() {
-  return fetchSuccessfulCIRuns(RECEIVER_API_BASE, MIN_RECEIVER_RUN_NUMBER);
+  return fetchSuccessfulCIRuns(RECEIVER_API_BASE, RECEIVER_BRANCH, MIN_RECEIVER_RUN_NUMBER);
 }
 
 /**

@@ -2,8 +2,8 @@
 //
 // Data sources (pre-computed, updated 2025-06):
 //   1. /mnt/d/uf2 flasher/config.yaml — local flasher config
-//   2. jitingcn/SlimeVR-Tracker-nRF workflow.yml — CI build matrix (tracker)
-//   3. jitingcn/SlimeVR-Tracker-nRF-Receiver workflow.yml — CI build matrix (receiver)
+//   2. SKPastry/SlimeVR-Tracker-nRF devc workflow.yml — CI build matrix (tracker)
+//   3. SKPastry/SlimeVR-Tracker-nRF-Receiver devc workflow.yml — CI build matrix (receiver)
 //   4. Shine-Bright-Meow/SlimeNRF-Firmware-CI boards.matrix.json — community CI
 //
 // Static maps updated from these sources. Online fetch refreshes at runtime.
@@ -205,12 +205,12 @@ export function getReceiverBoardMap() {
 
 // ── Online Sources ──────────────────────────────────────────────────
 
-const WORKFLOW_URL = 'https://raw.githubusercontent.com/jitingcn/SlimeVR-Tracker-nRF/refs/heads/dev/.github/workflows/workflow.yml';
-const RECEIVER_WORKFLOW_URL = 'https://raw.githubusercontent.com/jitingcn/SlimeVR-Tracker-nRF-Receiver/refs/heads/dev/.github/workflows/workflow.yml';
+const WORKFLOW_URL = 'https://raw.githubusercontent.com/SKPastry/SlimeVR-Tracker-nRF/refs/heads/devc/.github/workflows/workflow.yml';
+const RECEIVER_WORKFLOW_URL = 'https://raw.githubusercontent.com/SKPastry/SlimeVR-Tracker-nRF-Receiver/refs/heads/devc/.github/workflows/workflow.yml';
 const BOARDS_MATRIX_URL = 'https://raw.githubusercontent.com/Shine-Bright-Meow/SlimeNRF-Firmware-CI/refs/heads/main/boards.matrix.json';
 
 /**
- * Fetch board→filename mapping from jitingcn tracker workflow.yml.
+ * Fetch board→filename mapping from the SKPastry tracker devc workflow.yml.
  * Parses the YAML matrix section via regex.
  */
 async function fetchWorkflowMap() {
@@ -228,7 +228,7 @@ async function fetchWorkflowMap() {
 }
 
 /**
- * Fetch board→filename mapping from jitingcn receiver workflow.yml.
+ * Fetch board→filename mapping from the SKPastry receiver devc workflow.yml.
  */
 async function fetchReceiverWorkflowMap() {
   const resp = await fetch(RECEIVER_WORKFLOW_URL);

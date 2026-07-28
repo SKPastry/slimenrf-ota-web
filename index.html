@@ -143,7 +143,10 @@
     <div class="alert alert-info shadow-sm text-sm" x-show="!otaNoticeHidden">
       <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       <div>
-        <p x-html="$t('notice.otaRequires', { link: '<a href=\'https://github.com/jitingcn/SlimeVR-Tracker-nRF/releases/tag/260528\' target=\'_blank\' class=\'link font-semibold\'>260528</a>', both: '<b>' + $t('notice.both') + '</b>' })"></p>
+        <p x-html="$t('notice.otaRequires', {
+          tracker: '<a href=\'https://github.com/SKPastry/SlimeVR-Tracker-nRF/tree/devc\' target=\'_blank\' rel=\'noopener\' class=\'link font-semibold\'>devc</a>',
+          receiver: '<a href=\'https://github.com/SKPastry/SlimeVR-Tracker-nRF-Receiver/tree/devc\' target=\'_blank\' rel=\'noopener\' class=\'link font-semibold\'>devc</a>'
+        })"></p>
       </div>
       <button class="btn btn-ghost btn-xs btn-circle shrink-0" @click="otaNoticeHidden = true" title="Dismiss">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -1100,8 +1103,8 @@
   <footer class="footer footer-center py-3 px-4 text-base-content/50 text-xs">
     <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-0.5">
       <span class="whitespace-nowrap"><span x-text="$t('title')"></span> — <span x-text="$t('footer.by')"></span> <a href="https://github.com/jitingcn" class="link link-hover" target="_blank" rel="noopener">jitingcn</a></span>
-      <a href="https://github.com/jitingcn/SlimeVR-Tracker-nRF" class="link link-hover whitespace-nowrap" target="_blank" rel="noopener" x-text="$t('footer.trackerFirmware')"></a>
-      <a href="https://github.com/jitingcn/SlimeVR-Tracker-nRF-Receiver" class="link link-hover whitespace-nowrap" target="_blank" rel="noopener" x-text="$t('footer.receiverFirmware')"></a>
+      <a href="https://github.com/SKPastry/SlimeVR-Tracker-nRF/tree/devc" class="link link-hover whitespace-nowrap" target="_blank" rel="noopener" x-text="$t('footer.trackerFirmware')"></a>
+      <a href="https://github.com/SKPastry/SlimeVR-Tracker-nRF-Receiver/tree/devc" class="link link-hover whitespace-nowrap" target="_blank" rel="noopener" x-text="$t('footer.receiverFirmware')"></a>
     </div>
   </footer>
 

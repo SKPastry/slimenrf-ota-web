@@ -22,8 +22,7 @@ export default {
 
   // ── OTA 提示 ──────────────────────────────────────────
   notice: {
-    otaRequires: 'OTA 需要接收器和追踪器{both}运行 {link} 或更新版本的固件。如需要，请先通过 USB/UF2 刷写。',
-    both: '都',
+    otaRequires: 'OTA 需要使用来自 {tracker} 的兼容追踪器固件和来自 {receiver} 的接收器固件。如需要，请先通过 USB/UF2 刷写。',
   },
 
   // ── 接收器卡片 ─────────────────────────────────────────
@@ -55,8 +54,8 @@ export default {
   gh: {
     title: '从 GitHub 下载固件',
     releases: '发布版本',
-    trackerCi: '追踪器 CI',
-    receiverCi: '接收器 CI',
+    trackerCi: '追踪器 CI（devc）',
+    receiverCi: '接收器 CI（devc）',
     onlyMatched: '仅匹配',
     selectCiBuild: '— 选择 CI 构建 —',
     selectReceiverCiBuild: '— 选择接收器 CI 构建 —',
@@ -150,7 +149,7 @@ export default {
   // ── 页脚 ──────────────────────────────────────────────
   footer: {
     by: '作者',
-    trackerFirmware: '追踪器固件',
-    receiverFirmware: '接收器固件',
+    trackerFirmware: '追踪器固件（devc）',
+    receiverFirmware: '接收器固件（devc）',
   },
 };

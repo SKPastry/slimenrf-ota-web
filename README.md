@@ -7,10 +7,10 @@ A web-based firmware update tool for SlimeNRF trackers using WebHID.
 ## Firmware Compatibility
 
 This tool is designed specifically for the
-[SlimeNRF tracker firmware](https://github.com/jitingcn/SlimeVR-Tracker-nRF)
+[SlimeNRF tracker firmware (`devc`)](https://github.com/SKPastry/SlimeVR-Tracker-nRF/tree/devc)
 and
-[SlimeNRF receiver firmware](https://github.com/jitingcn/SlimeVR-Tracker-nRF-Receiver)
-maintained by `jitingcn`.
+[SlimeNRF receiver firmware (`devc`)](https://github.com/SKPastry/SlimeVR-Tracker-nRF-Receiver/tree/devc)
+maintained by `SKPastry`.
 
 > [!WARNING]
 > The OTA protocol is specific to the current SlimeNRF implementation. It may

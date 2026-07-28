@@ -22,8 +22,7 @@ export default {
 
   // ── OTA notice ─────────────────────────────────────────
   notice: {
-    otaRequires: 'OTA requires firmware {link} or later on {both} the receiver and trackers. Please flash via USB/UF2 first if needed.',
-    both: 'both',
+    otaRequires: 'OTA requires compatible tracker firmware from {tracker} and receiver firmware from {receiver}. Please flash via USB/UF2 first if needed.',
   },
 
   // ── Receiver card ──────────────────────────────────────
@@ -55,8 +54,8 @@ export default {
   gh: {
     title: 'Download Firmwares from GitHub',
     releases: 'Releases',
-    trackerCi: 'Tracker CI',
-    receiverCi: 'Receiver CI',
+    trackerCi: 'Tracker CI (devc)',
+    receiverCi: 'Receiver CI (devc)',
     onlyMatched: 'Only Matched',
     selectCiBuild: '— Select a CI build —',
     selectReceiverCiBuild: '— Select a receiver CI build —',
@@ -150,7 +149,7 @@ export default {
   // ── Footer ─────────────────────────────────────────────
   footer: {
     by: 'by',
-    trackerFirmware: 'Tracker Firmware',
-    receiverFirmware: 'Receiver Firmware',
+    trackerFirmware: 'Tracker Firmware (devc)',
+    receiverFirmware: 'Receiver Firmware (devc)',
   },
 };
