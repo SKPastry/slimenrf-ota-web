@@ -54,8 +54,8 @@ export default {
   gh: {
     title: '从 GitHub 下载固件',
     releases: '发布版本',
-    trackerCi: '追踪器 CI（devc）',
-    receiverCi: '接收器 CI（devc）',
+    trackerCi: '追踪器 CI（所有分支）',
+    receiverCi: '接收器 CI（所有分支）',
     onlyMatched: '仅匹配',
     selectCiBuild: '— 选择 CI 构建 —',
     selectReceiverCiBuild: '— 选择接收器 CI 构建 —',

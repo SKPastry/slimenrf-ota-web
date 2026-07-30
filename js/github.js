@@ -13,8 +13,6 @@ const TRACKER_OWNER = 'SKPastry';
 const RECEIVER_OWNER = 'SKPastry';
 const TRACKER_REPO = 'SlimeVR-Tracker-nRF';
 const RECEIVER_REPO = 'SlimeVR-Tracker-nRF-Receiver';
-const TRACKER_BRANCH = 'devc';
-const RECEIVER_BRANCH = 'devc';
 const TRACKER_API_BASE = `https://api.github.com/repos/${TRACKER_OWNER}/${TRACKER_REPO}`;
 const RECEIVER_API_BASE = `https://api.github.com/repos/${RECEIVER_OWNER}/${RECEIVER_REPO}`;
 const TRACKER_NIGHTLY_LINK = `https://nightly.link/${TRACKER_OWNER}/${TRACKER_REPO}`;
@@ -92,11 +90,10 @@ export async function fetchReleases() {
 
 // ── CI Runs API ──────────────────────────────────────────────────────
 
-async function fetchSuccessfulCIRuns(apiBase, branch, minRunNumber) {
+async function fetchSuccessfulCIRuns(apiBase, minRunNumber) {
   const runLists = await Promise.all(
     CI_RUN_EVENTS.map(async (event) => {
       const params = new URLSearchParams({
-        branch,
         event,
         status: 'success',
         per_page: String(CI_RUN_LIST_LIMIT),
@@ -129,12 +126,12 @@ async function fetchSuccessfulCIRuns(apiBase, branch, minRunNumber) {
 }
 
 /**
- * Fetch successful tracker CI runs from the primary branch.
+ * Fetch successful tracker CI runs across all branches.
  * Includes automated push builds and manually dispatched workflow runs.
  * Returns: [{ id, number, title, date, sha, branch }]
  */
 export async function fetchCIRuns() {
-  return fetchSuccessfulCIRuns(TRACKER_API_BASE, TRACKER_BRANCH, MIN_RUN_NUMBER);
+  return fetchSuccessfulCIRuns(TRACKER_API_BASE, MIN_RUN_NUMBER);
 }
 
 /**
@@ -158,12 +155,12 @@ export async function fetchRunArtifacts(runId) {
 }
 
 /**
- * Fetch successful receiver CI runs from the primary branch.
+ * Fetch successful receiver CI runs across all branches.
  * Includes automated push builds and manually dispatched workflow runs.
  * Returns: [{ id, number, title, date, sha, branch }]
  */
 export async function fetchReceiverCIRuns() {
-  return fetchSuccessfulCIRuns(RECEIVER_API_BASE, RECEIVER_BRANCH, MIN_RECEIVER_RUN_NUMBER);
+  return fetchSuccessfulCIRuns(RECEIVER_API_BASE, MIN_RECEIVER_RUN_NUMBER);
 }
 
 /**

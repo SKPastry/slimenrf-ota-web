@@ -54,8 +54,8 @@ export default {
   gh: {
     title: 'Download Firmwares from GitHub',
     releases: 'Releases',
-    trackerCi: 'Tracker CI (devc)',
-    receiverCi: 'Receiver CI (devc)',
+    trackerCi: 'Tracker CI (all branches)',
+    receiverCi: 'Receiver CI (all branches)',
     onlyMatched: 'Only Matched',
     selectCiBuild: '— Select a CI build —',
     selectReceiverCiBuild: '— Select a receiver CI build —',

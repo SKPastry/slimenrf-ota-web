@@ -492,7 +492,7 @@
                     <option value="" disabled x-text="$t('gh.selectCiBuild')"></option>
                     <template x-for="run in ghCIRuns" :key="run.id">
                       <option :value="run.id"
-                              x-text="'#' + run.number + ' · ' + run.sha + ' · ' + run.title.slice(0, 50) + ' · ' + formatDate(run.date)"
+                              x-text="'#' + run.number + ' · ' + run.branch + ' · ' + run.sha + ' · ' + run.title.slice(0, 50) + ' · ' + formatDate(run.date)"
                               :selected="run.id === ghSelectedRun"></option>
                     </template>
                   </select>
@@ -593,7 +593,7 @@
                     <option value="" disabled x-text="$t('gh.selectReceiverCiBuild')"></option>
                     <template x-for="run in ghReceiverCIRuns" :key="run.id">
                       <option :value="run.id"
-                              x-text="'#' + run.number + ' · ' + run.sha + ' · ' + run.title.slice(0, 50) + ' · ' + formatDate(run.date)"
+                              x-text="'#' + run.number + ' · ' + run.branch + ' · ' + run.sha + ' · ' + run.title.slice(0, 50) + ' · ' + formatDate(run.date)"
                               :selected="run.id === ghSelectedReceiverRun"></option>
                     </template>
                   </select>
