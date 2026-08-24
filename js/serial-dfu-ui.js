@@ -217,7 +217,7 @@ Alpine.data('serialDfuApp', () => ({
     this.dfuFirmwareTarget = boardTarget || '';
     this.dfuFirmwareAmbiguous = Boolean(ambiguous);
     this.dfuExpectedRole = role || '';
-    this.dfuExpectedTarget = boardTarget || '';
+    this.dfuExpectedTarget = '';
     this.dfuModelConfirmation = '';
   },
 
