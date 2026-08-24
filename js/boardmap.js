@@ -180,6 +180,67 @@ export function matchReceiverBoardTarget(filename) {
 }
 
 /**
+ * Infer a firmware role and target from its filename.
+ * Filename matching is a host-side safety hint, not authenticated metadata.
+ */
+export function detectFirmwareIdentity(filename) {
+  const trackerTarget = matchBoardTarget(filename);
+  const receiverTarget = matchReceiverBoardTarget(filename);
+
+  if (trackerTarget && receiverTarget) {
+    return {
+      role: null,
+      boardTarget: null,
+      ambiguous: true,
+      candidates: [
+        { role: 'tracker', boardTarget: trackerTarget },
+        { role: 'receiver', boardTarget: receiverTarget },
+      ],
+    };
+  }
+  if (trackerTarget) {
+    return { role: 'tracker', boardTarget: trackerTarget, ambiguous: false, candidates: [] };
+  }
+  if (receiverTarget) {
+    return { role: 'receiver', boardTarget: receiverTarget, ambiguous: false, candidates: [] };
+  }
+  return { role: null, boardTarget: null, ambiguous: false, candidates: [] };
+}
+
+/** Return a stable role-qualified key so tracker/receiver targets cannot collide. */
+export function firmwareTargetKey(role, boardTarget) {
+  return `${role}:${boardTarget}`;
+}
+
+/**
+ * Compare a filename-derived firmware identity with a device target.
+ * Same-board mode changes remain possible, but require an explicit warning.
+ */
+export function compareFirmwareTarget(role, boardTarget, identity) {
+  if (identity?.ambiguous) {
+    return { level: 'error', code: 'ambiguous' };
+  }
+  if (!identity?.role || !identity?.boardTarget) {
+    return { level: 'warning', code: 'unknown' };
+  }
+  if (identity.role !== role) {
+    return { level: 'error', code: 'role-mismatch' };
+  }
+  if (identity.boardTarget === boardTarget) {
+    return { level: 'ok', code: 'exact' };
+  }
+
+  const deviceParts = boardTarget.split('/');
+  const firmwareParts = identity.boardTarget.split('/');
+  const sameBoardAndSoc = deviceParts[0] === firmwareParts[0]
+    && deviceParts[1] === firmwareParts[1];
+  if (sameBoardAndSoc) {
+    return { level: 'warning', code: 'mode-change' };
+  }
+  return { level: 'error', code: 'target-mismatch' };
+}
+
+/**
  * Get a friendly short name for a board target.
  */
 export function boardFriendlyName(boardTarget) {
