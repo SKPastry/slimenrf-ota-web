@@ -10,7 +10,7 @@
 
 // ── Static Tracker Map ──────────────────────────────────────────────
 // boardTarget → [filename patterns (case-insensitive substring match)]
-// More specific patterns must come before general ones.
+// When multiple patterns match, the longest (most specific) pattern wins.
 
 const STATIC_MAP = {
   // ── Styria ────────────────────────────────────────────────────
@@ -83,6 +83,18 @@ const STATIC_MAP = {
     'Aero_Tracker',   // workflow.yml
     'aero_tracker',   // config.yaml
   ],
+  'aero_pro_uf2/nrf52840': [
+    'Aero_Tracker_Pro',  // workflow.yml
+  ],
+
+
+  // ── XIAO nRF54L ───────────────────────────────────────────────
+  'xiao_nrf54lm20a/nrf54lm20a/cpuapp/sense': [
+    'SlimeNRF_XIAO_nRF54LM20A_Sense_Tracker',  // workflow.yml
+  ],
+  'xiao_nrf54lm20a/nrf54lm20a/cpuapp': [
+    'SlimeNRF_XIAO_nRF54LM20A_Tracker',  // workflow.yml
+  ],
 
   // ── XIAO (sense MUST be before generic xiao) ──────────────────
   'xiao_ble/nrf52840/sense': [
@@ -107,6 +119,17 @@ const STATIC_MAP = {
   'nini_slimevr_mag_uf2/nrf52833': [
     'NiNi_SlimeVR_MAG',  // workflow.yml
   ],
+  // ── Other current workflow targets ─────────────────────────────
+  'nekonya_tracker_uf2/nrf52833': [
+    'nekonya_tracker_uf2',  // workflow.yml
+  ],
+  'estmini_uf2/nrf52840': [
+    'Estmini_Tracker',  // workflow.yml
+  ],
+  'paper_smol_v1_uf2/nrf52833': [
+    'paper_smol_v1_uf2',  // workflow.yml
+  ],
+
 
   // ── R3 ────────────────────────────────────────────────────────
   'slimenrf_r3/nrf52840/uf2': [
@@ -151,18 +174,31 @@ let _mergedReceiverMap = { ...RECEIVER_STATIC_MAP };
 
 // ── Matching ────────────────────────────────────────────────────────
 
+/** Return the board whose longest filename pattern matches. */
+function matchTargetInMap(filename, map) {
+  const lower = filename.toLowerCase();
+  let bestBoard = null;
+  let bestPatternLength = -1;
+
+  for (const [board, patterns] of Object.entries(map)) {
+    for (const pattern of patterns) {
+      const normalizedPattern = pattern.toLowerCase();
+      if (normalizedPattern.length > bestPatternLength && lower.includes(normalizedPattern)) {
+        bestBoard = board;
+        bestPatternLength = normalizedPattern.length;
+      }
+    }
+  }
+
+  return bestBoard;
+}
+
 /**
  * Match a firmware filename to a tracker board target.
  * Returns the board target string or null if no match.
  */
 export function matchBoardTarget(filename) {
-  const lower = filename.toLowerCase();
-  for (const [board, patterns] of Object.entries(_mergedMap)) {
-    for (const pattern of patterns) {
-      if (lower.includes(pattern.toLowerCase())) return board;
-    }
-  }
-  return null;
+  return matchTargetInMap(filename, _mergedMap);
 }
 
 /**
@@ -170,13 +206,7 @@ export function matchBoardTarget(filename) {
  * Returns the board target string or null if no match.
  */
 export function matchReceiverBoardTarget(filename) {
-  const lower = filename.toLowerCase();
-  for (const [board, patterns] of Object.entries(_mergedReceiverMap)) {
-    for (const pattern of patterns) {
-      if (lower.includes(pattern.toLowerCase())) return board;
-    }
-  }
-  return null;
+  return matchTargetInMap(filename, _mergedReceiverMap);
 }
 
 /**
