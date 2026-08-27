@@ -7,6 +7,7 @@ export default {
   webhid: {
     notSupported: '不支持 WebHID',
     useChrome: '请使用 {chrome}、{edge} 或 {opera} 来使用 WebHID。',
+    serialAvailable: 'WebHID OTA 不可用，但可以使用下方的串口 DFU 刷写。',
   },
 
   // ── 连接卡片 ──────────────────────────────────────────
@@ -135,7 +136,7 @@ export default {
     usb: 'USB',
     description: '通过 USB 串口直接刷写固件 — 设备须处于 DFU/引导程序模式（双击重置或输入 {cmd} 命令）',
     webSerialNotSupported: '不支持 Web Serial',
-    webSerialRequires: 'Web Serial API 需要 Chrome 89+、Edge 89+ 或 Opera 76+。',
+    webSerialRequires: '此浏览器不提供 Web Serial API。',
     protocol: '协议',
     autoDetect: '自动检测',
     adafruit: 'Adafruit（传统）',

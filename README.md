@@ -29,9 +29,8 @@ maintained by `jitingcn`.
 
 ## Browser Support
 
-WebHID requires a Chromium-based browser:
-- ✅ Chrome 89+ / Edge 89+ / Opera 75+
-- ❌ Firefox / Safari (no WebHID support)
+- WebHID OTA requires a Chromium-based browser such as Chrome, Edge, or Opera.
+- Serial DFU works independently in browsers that provide Web Serial, including Firefox builds with Web Serial support.
 
 ## Development
 

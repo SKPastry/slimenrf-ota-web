@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Update SlimeNRF tracker and receiver firmware from a Chromium browser using WebHID and Web Serial.">
+  <meta name="description" content="Update SlimeNRF tracker and receiver firmware using WebHID or Web Serial.">
   <meta name="color-scheme" content="dark light">
   <title>SlimeNRF OTA Updater</title>
 
@@ -53,8 +53,8 @@
        ═══════════════════════════════════════════════════════════════ -->
   <main class="flex-1 container mx-auto max-w-7xl p-4 space-y-4">
 
-    <!-- WebHID not supported -->
-    <template x-if="!webHIDSupported">
+    <!-- Browser capability notice -->
+    <template x-if="!webHIDSupported && !webSerialSupported">
       <div class="alert alert-warning shadow-lg">
         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         <div>
@@ -63,6 +63,16 @@
         </div>
       </div>
     </template>
+    <template x-if="!webHIDSupported && webSerialSupported">
+      <div class="alert alert-info shadow-lg">
+        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div>
+          <p class="font-semibold" x-text="$t('webhid.notSupported')"></p>
+          <p class="text-sm" x-text="$t('webhid.serialAvailable')"></p>
+        </div>
+      </div>
+    </template>
+
 
     <!-- ─── Connection Card ────────────────────────────────────── -->
     <div class="card bg-base-100 shadow-md" x-show="webHIDSupported">

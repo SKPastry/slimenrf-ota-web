@@ -7,6 +7,7 @@ export default {
   webhid: {
     notSupported: 'WebHID not supported',
     useChrome: 'Please use {chrome}, {edge}, or {opera} to access WebHID.',
+    serialAvailable: 'WebHID OTA is unavailable, but you can use Serial DFU below.',
   },
 
   // ── Connection card ────────────────────────────────────
@@ -135,7 +136,7 @@ export default {
     usb: 'USB',
     description: 'Flash firmware directly via USB serial — device must be in DFU/bootloader mode (double-tap reset or {cmd} command)',
     webSerialNotSupported: 'Web Serial not supported',
-    webSerialRequires: 'Web Serial API requires Chrome 89+, Edge 89+, or Opera 76+.',
+    webSerialRequires: 'This browser does not provide the Web Serial API.',
     protocol: 'Protocol',
     autoDetect: 'Auto-detect',
     adafruit: 'Adafruit (Legacy)',

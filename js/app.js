@@ -52,6 +52,7 @@ function looksLikeSdPlusApp(fwData, fwBase, deviceBase) {
 Alpine.data('otaApp', () => ({
   // ── Feature detection ───────────────────────────────────────
   webHIDSupported: 'hid' in navigator,
+  webSerialSupported: 'serial' in navigator,
   secureContext: window.isSecureContext,
 
   // ── UI state ────────────────────────────────────────────────
