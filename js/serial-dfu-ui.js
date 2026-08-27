@@ -2,11 +2,13 @@
 // Handles UI state for the Serial DFU card
 
 import { compareFirmwareTarget, detectFirmwareIdentity } from './boardmap.js';
+import { isDeveloperMode } from './dev-mode.js';
 
 import Alpine from 'alpinejs';
 
 Alpine.data('serialDfuApp', () => ({
   webSerialSupported: 'serial' in navigator,
+  developerMode: isDeveloperMode(),
 
   // State machine: 'idle' | 'running' | 'done'
   dfuState: 'idle',
@@ -50,6 +52,9 @@ Alpine.data('serialDfuApp', () => ({
   },
 
   get dfuTargetGuard() {
+    if (this.developerMode) {
+      return { level: 'warning', code: 'developer-bypass' };
+    }
     if (!this.dfuExpectedRole || !this.dfuExpectedTarget.trim()) {
       return { level: 'error', code: 'unconfirmed' };
     }
@@ -66,6 +71,7 @@ Alpine.data('serialDfuApp', () => ({
 
   get dfuTargetGuardMessage() {
     switch (this.dfuTargetGuard.code) {
+      case 'developer-bypass': return this.$t('dfu.developerBypass');
       case 'exact': return this.$t('dfu.targetExact');
       case 'unknown': return this.$t('dfu.targetUnknown');
       case 'mode-change': return this.$t('dfu.modeChange', { target: this.dfuFirmwareTarget });
@@ -109,7 +115,7 @@ Alpine.data('serialDfuApp', () => ({
   },
 
   async dfuStart() {
-    if (!this.dfuFile || this.dfuState === 'running' || this.dfuTargetGuard.level === 'error') return;
+    if (!this.dfuFile || this.dfuState === 'running' || (!this.developerMode && this.dfuTargetGuard.level === 'error')) return;
 
     this.dfuState = 'running';
     this.dfuProgress = 0;
@@ -168,6 +174,8 @@ Alpine.data('serialDfuApp', () => ({
   },
 
   async _confirmSerialDevice(device) {
+    if (this.developerMode) return true;
+
     this.dfuModelConfirmation = '';
     this.dfuConfirmation = {
       ...device,

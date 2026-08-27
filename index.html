@@ -52,6 +52,16 @@
        Main content
        ═══════════════════════════════════════════════════════════════ -->
   <main class="flex-1 container mx-auto max-w-7xl p-4 space-y-4">
+    <template x-if="developerMode">
+      <div class="alert alert-error shadow-lg">
+        <svg class="w-6 h-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div>
+          <p class="font-semibold" x-text="$t('dev.title')"></p>
+          <p class="text-sm" x-text="$t('dev.warning')"></p>
+        </div>
+      </div>
+    </template>
+
 
     <!-- Browser capability notice -->
     <template x-if="!webHIDSupported && !webSerialSupported">
@@ -1034,25 +1044,28 @@
               </div>
             </template>
 
-            <!-- Web Serial cannot read a SlimeNRF board target. First confirmation: enter it. -->
+            <!-- Web Serial cannot read a SlimeNRF board target. Require physical verification outside developer mode. -->
             <template x-if="dfuFile && dfuState === 'idle'">
-              <div class="rounded-lg border border-warning/50 bg-warning/15 p-3 text-base-content">
+              <div class="rounded-lg border p-3 text-base-content"
+                   :class="developerMode ? 'border-error/50 bg-error/15' : 'border-warning/50 bg-warning/15'">
                 <div class="w-full space-y-3">
-                  <div class="text-sm font-semibold text-base-content" x-text="$t('dfu.modelRequired')"></div>
-                  <div class="text-xs leading-relaxed text-base-content/80" x-text="$t('dfu.modelRequiredDetail')"></div>
-                  <label class="form-control w-full gap-1.5">
-                    <span class="label-text text-xs font-medium text-base-content/90" x-text="$t('dfu.expectedTarget')"></span>
-                    <div class="flex flex-col gap-2 sm:flex-row">
-                      <select class="select select-bordered select-sm w-full bg-base-100 text-base-content sm:w-36" x-model="dfuExpectedRole">
-                        <option value="" x-text="$t('dfu.selectRole')"></option>
-                        <option value="tracker" x-text="$t('gh.tracker')"></option>
-                        <option value="receiver" x-text="$t('gh.receiver')"></option>
-                      </select>
-                      <input class="input input-bordered input-sm min-w-0 flex-1 bg-base-100 font-mono text-base-content placeholder:text-base-content/50" type="text"
-                             x-model="dfuExpectedTarget" :placeholder="$t('dfu.expectedTargetPlaceholder')">
-                    </div>
-                  </label>
-                  <template x-if="dfuExpectedRole && dfuExpectedTarget.trim()">
+                  <div class="text-sm font-semibold text-base-content" x-text="developerMode ? $t('dfu.developerModeTitle') : $t('dfu.modelRequired')"></div>
+                  <div class="text-xs leading-relaxed text-base-content/80" x-text="developerMode ? $t('dfu.developerModeDetail') : $t('dfu.modelRequiredDetail')"></div>
+                  <template x-if="!developerMode">
+                    <label class="form-control w-full gap-1.5">
+                      <span class="label-text text-xs font-medium text-base-content/90" x-text="$t('dfu.expectedTarget')"></span>
+                      <div class="flex flex-col gap-2 sm:flex-row">
+                        <select class="select select-bordered select-sm w-full bg-base-100 text-base-content sm:w-36" x-model="dfuExpectedRole">
+                          <option value="" x-text="$t('dfu.selectRole')"></option>
+                          <option value="tracker" x-text="$t('gh.tracker')"></option>
+                          <option value="receiver" x-text="$t('gh.receiver')"></option>
+                        </select>
+                        <input class="input input-bordered input-sm min-w-0 flex-1 bg-base-100 font-mono text-base-content placeholder:text-base-content/50" type="text"
+                               x-model="dfuExpectedTarget" :placeholder="$t('dfu.expectedTargetPlaceholder')">
+                      </div>
+                    </label>
+                  </template>
+                  <template x-if="developerMode || (dfuExpectedRole && dfuExpectedTarget.trim())">
                     <div class="rounded-md px-2 py-1 text-xs font-medium"
                          :class="dfuTargetGuard.level === 'error' ? 'bg-error text-error-content' : (dfuTargetGuard.level === 'warning' ? 'bg-warning text-warning-content' : 'bg-success text-success-content')"
                          x-text="dfuTargetGuardMessage"></div>
@@ -1065,7 +1078,7 @@
             <div class="mt-2 flex gap-2 items-center">
               <template x-if="dfuState === 'idle'">
                 <button class="btn btn-primary btn-sm gap-2"
-                        :disabled="!dfuFile || dfuTargetGuard.level === 'error'"
+                        :disabled="!dfuFile || (!developerMode && dfuTargetGuard.level === 'error')"
                         @click="dfuStart()">
                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                   <span x-text="$t('dfu.flashViaSerial')"></span>

@@ -13,6 +13,7 @@ import {
   matchReceiverBoardTarget,
   refreshOnlineMaps,
 } from './boardmap.js';
+import { isDeveloperMode } from './dev-mode.js';
 import {
   fetchReleases, fetchCIRuns, fetchRunArtifacts,
   fetchReceiverCIRuns, fetchReceiverRunArtifacts,
@@ -54,6 +55,7 @@ Alpine.data('otaApp', () => ({
   webHIDSupported: 'hid' in navigator,
   webSerialSupported: 'serial' in navigator,
   secureContext: window.isSecureContext,
+  developerMode: isDeveloperMode(),
 
   // ── UI state ────────────────────────────────────────────────
   otaNoticeHidden: false,
@@ -891,6 +893,7 @@ Alpine.data('otaApp', () => ({
   mappingGuard(target, fwId = this.firmwareMapping[target.key]) {
     const firmware = fwId ? this._getFirmware(Number(fwId)) : null;
     if (!firmware) return { firmware: null, level: 'error', code: 'unmapped' };
+    if (this.developerMode) return { firmware, level: 'warning', code: 'developer-bypass' };
     return { firmware, ...compareFirmwareTarget(target.role, target.boardTarget, firmware.identity) };
   },
 
@@ -898,6 +901,7 @@ Alpine.data('otaApp', () => ({
     const guard = this.mappingGuard(target, fwId);
     const identity = guard.firmware?.identity;
     switch (guard.code) {
+      case 'developer-bypass': return this.$t('fw.developerBypass');
       case 'exact': return this.$t('fw.targetExact');
       case 'unknown': return this.$t('fw.targetUnknown');
       case 'mode-change': return this.$t('fw.modeChange', { target: identity.boardTarget });

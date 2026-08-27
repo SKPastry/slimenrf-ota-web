@@ -39,6 +39,8 @@ pnpm install
 pnpm dev          # Vite dev server with HTTPS
 ```
 
+Open `https://localhost:5173/?dev=true` to enable the explicit developer bypass. In this mode, firmware can be mapped to a different OTA target, and Serial DFU skips the physical-target and second typed confirmations. The page displays a persistent warning because an incompatible image may require USB or SWD recovery.
+
 ### Deploy
 
 ```bash

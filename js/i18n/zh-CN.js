@@ -3,6 +3,11 @@ export default {
   // ── 应用标题 ──────────────────────────────────────────
   title: 'SlimeNRF OTA 更新工具',
 
+  dev: {
+    title: '已启用开发者模式',
+    warning: '板型和角色验证已禁用。任意已加载固件都可映射或刷写到任意 target。',
+  },
+
   // ── WebHID 不支持 ─────────────────────────────────────
   webhid: {
     notSupported: '不支持 WebHID',
@@ -97,6 +102,7 @@ export default {
     unmappedTargets: '存在未映射目标',
     selectFirmware: '— 选择固件 —',
     targetExact: '固件 target 与设备 target 完全匹配。',
+    developerBypass: '开发者模式：已绕过 target 验证。',
     targetUnknown: '文件名无法识别已知 target。刷写前必须手动确认该固件。',
     modeChange: '检测到已知模式变更：固件 target 为 {target}。请确认硬件接线和传感器总线模式。',
     roleMismatch: '已阻止：这是{role}固件，不属于该设备角色。',
@@ -149,6 +155,9 @@ export default {
     abort: '中止',
     dfuComplete: 'DFU 完成！',
     dfuFailed: 'DFU 失败',
+    developerModeTitle: '开发者模式：已禁用串口 target 验证',
+    developerModeDetail: '不会要求输入实物 target 或进行第二次文本确认。所选固件将直接发送给选择的串口设备。',
+    developerBypass: '开发者模式：已绕过角色和 target 检查。',
     modelRequired: '串口 DFU 无法验证设备型号。',
     modelRequiredDetail: '请输入您在设备实物上核对的完整 target。这是第一次确认；当前引导程序不会报告可信型号。',
     expectedTarget: '实物核对后的设备 target',

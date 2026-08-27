@@ -3,6 +3,11 @@ export default {
   // ── App title ──────────────────────────────────────────
   title: 'SlimeNRF OTA Updater',
 
+  dev: {
+    title: 'Developer mode enabled',
+    warning: 'Board and role validation is disabled. Any loaded firmware can be mapped or flashed to any target.',
+  },
+
   // ── WebHID not supported ──────────────────────────────
   webhid: {
     notSupported: 'WebHID not supported',
@@ -97,6 +102,7 @@ export default {
     unmappedTargets: 'Unmapped targets',
     selectFirmware: '— Select firmware —',
     targetExact: 'Firmware target matches the device target.',
+    developerBypass: 'Developer mode: target validation bypassed.',
     targetUnknown: 'The filename does not identify a known target. Verify this firmware manually before flashing.',
     modeChange: 'Known mode change: firmware target is {target}. Verify the hardware wiring and sensor bus mode.',
     roleMismatch: 'Blocked: this is {role} firmware, not firmware for this device role.',
@@ -149,6 +155,9 @@ export default {
     abort: 'Abort',
     dfuComplete: 'DFU Complete!',
     dfuFailed: 'DFU Failed',
+    developerModeTitle: 'Developer mode: Serial target verification disabled',
+    developerModeDetail: 'The physical target and second typed confirmation will not be requested. The selected firmware will be sent to the chosen serial device.',
+    developerBypass: 'Developer mode: role and target checks bypassed.',
     modelRequired: 'Serial DFU cannot verify the device model.',
     modelRequiredDetail: 'Enter the exact target you physically verified on the device. This is the first confirmation; the bootloader does not report a trustworthy model.',
     expectedTarget: 'Physically verified device target',
