@@ -1019,7 +1019,7 @@ Alpine.data('otaApp', () => ({
 
     const ids = this.selectedIds;
     this.updating = true;
-    this.updateSuccess = null;
+    this._session.beginUpdate();
     clearTimeout(this._updateDismissTimer);
     this.updatePhase = '';
     this.updateStep = 0;
@@ -1031,6 +1031,7 @@ Alpine.data('otaApp', () => ({
       const boardGroups = {};
 
       for (const tid of ids) {
+        this._session._ensureActive();
         const cached = this.trackers[tid]?.info;
         const info = cached || await this._session.queryInfo(tid);
         if (!info || !info.boardTarget) {
@@ -1103,6 +1104,7 @@ Alpine.data('otaApp', () => ({
       // Execute tracker batches
       let allOk = true;
       for (let b = 0; b < plan.length; b++) {
+        this._session._ensureActive();
         const { boardTarget, ids: batchIds, firmware: fw } = plan[b];
         this.batchInfo = { current: b + 1, total: plan.length, trackerIds: batchIds };
         this.progress = { consumed: 0, total: 1, speed: 0, inFlight: 0 };
@@ -1112,15 +1114,19 @@ Alpine.data('otaApp', () => ({
         if (!ok) allOk = false;
 
         // Brief pause between batches
-        if (b + 1 < plan.length) await new Promise((r) => setTimeout(r, 2000));
+        if (b + 1 < plan.length) {
+          await new Promise((r) => setTimeout(r, 2000));
+          this._session._ensureActive();
+        }
       }
 
-      // After all tracker batches, update receiver if mapped
+      this._session._ensureActive();
       if (allOk && this._hasReceiverUpdate()) {
         if (plan.length > 0) {
           this.log('Tracker updates complete. Updating receiver…');
           await new Promise((r) => setTimeout(r, 2000));
         }
+        this._session._ensureActive();
         const rcvOk = await this._performReceiverOTA();
         if (!rcvOk) allOk = false;
       }
@@ -1151,13 +1157,13 @@ Alpine.data('otaApp', () => ({
       }
       this.updateSuccess = false;
       this._activeFirmware = null;
-      try { await this._session._send(buildAbort(0xff)); } catch {}
+      this._session.abort();
+      await this._session._abortPromise;
     } finally {
       this.updating = false;
       this.receiverUpdating = false;
     }
   },
-
   async abortUpdate() {
     if (!this._session) return;
     this._session.abort();
@@ -1300,7 +1306,7 @@ Alpine.data('otaApp', () => ({
 
     try {
       const ok = await this._session.performReceiverUpdate(fw, bt);
-      this.log(ok ? '✓ Receiver OTA update completed' : '✗ Receiver OTA update failed');
+      this.log(ok ? 'Receiver activation submitted; reconnect to confirm firmware.' : 'Receiver OTA update failed');
       return ok;
     } catch (e) {
       this.log(`✗ Receiver OTA error: ${e.message}`);

@@ -35,7 +35,16 @@ export class OTASession {
     this._reportHandlers = [];
     this._inputHandler = this._onInputReport.bind(this);
     this._aborted = false;
+    this._abortPromise = null;
+    this._abortTarget = 0xff;
     device.addEventListener('inputreport', this._inputHandler);
+  }
+
+  beginUpdate() {
+    this._aborted = false;
+    this._abortPromise = null;
+    this._abortTarget = 0xff;
+    this._reportHandlers = [];
   }
 
   destroy() {
@@ -45,6 +54,14 @@ export class OTASession {
 
   abort() {
     this._aborted = true;
+    // Notify the device even when a status waiter is currently sleeping.
+    if (!this._abortPromise) {
+      this._abortPromise = this._send(buildAbort(this._abortTarget)).catch(() => {});
+    }
+  }
+
+  _ensureActive() {
+    if (this._aborted) throw new Error('Aborted');
   }
 
   // ── Internal helpers ────────────────────────────────────────────
@@ -191,21 +208,16 @@ export class OTASession {
     return results;
   }
 
-  // ── Multi-Status Wait ───────────────────────────────────────────
-
-  /**
-   * Wait for specific status from multiple trackers.
-   * Optionally resends a command to non-responsive trackers.
-   */
   async _waitForMultiStatus(trackerIds, expected, timeoutMs,
-                            resendCb = null, resendIntervalMs = 3000) {
+                            resendCb = null, resendIntervalMs = 3000, sendFirst = false) {
     const results = {};
     const pending = new Set(trackerIds);
     const deadline = performance.now() + timeoutMs;
-    let nextResend = resendCb ? performance.now() + resendIntervalMs : Infinity;
+    let nextResend = resendCb ? performance.now() + (sendFirst ? 0 : resendIntervalMs) : Infinity;
     let resendCount = 0;
 
     const remove = this._addHandler((report) => {
+      if (this._aborted) return;
       if (report[0] === HID_OTA_STATUS && pending.has(report[1])) {
         const st = parseStatus(report);
         if (st && expected.has(st.status)) {
@@ -223,10 +235,13 @@ export class OTASession {
         if (resendCb && performance.now() >= nextResend) {
           resendCount++;
           for (const tid of pending) {
+            this._ensureActive();
             await resendCb(tid);
             await sleep(50);
           }
-          this._log(`  (retry #${resendCount} for tracker${pending.size > 1 ? 's' : ''} ${[...pending].sort().join(', ')})`);
+          if (!sendFirst || resendCount > 1) {
+            this._log(`  (retry #${resendCount - (sendFirst ? 1 : 0)} for tracker${pending.size > 1 ? 's' : ''} ${[...pending].sort().join(', ')})`);
+          }
           nextResend = performance.now() + resendIntervalMs;
         }
 
@@ -378,10 +393,12 @@ export class OTASession {
 
   /**
    * Perform OTA update for a batch of trackers with the same firmware.
-   * Returns true if at least one tracker was updated successfully.
+   * Returns true only if every requested tracker reports COMPLETE.
    */
   async performUpdate(trackerIds, firmware, boardTarget) {
-    this._aborted = false;
+    this._ensureActive();
+    this._abortPromise = null;
+    this._abortTarget = 0xff;
     const totalPackets = Math.ceil(firmware.data.length / OTA_DATA_MAX_PAYLOAD);
     const imageSize = firmware.data.length;
 
@@ -393,8 +410,8 @@ export class OTASession {
     // ── Step 1: BEGIN ─────────────────────────────────────────
     this.cb.onPhase?.('begin', 1);
     this._log(`[1/4] Sending BEGIN to ${trackerIds.length} tracker(s)…`);
-
     for (const tid of trackerIds) {
+      this._ensureActive();
       await this._send(buildBegin(tid, imageSize, firmware.crc32,
         totalPackets, boardTarget, firmware.baseAddress));
       await sleep(50);
@@ -442,7 +459,7 @@ export class OTASession {
     this._log(`[2/4] Streaming firmware to ${activeIds.length} tracker(s)…`);
 
     for (const tid of activeIds) this.cb.onTrackerStatus?.(tid, 'Receiving');
-
+    this._ensureActive();
     const streamOk = await this._streamData(activeIds, firmware, totalPackets);
     if (!streamOk) {
       await this._send(buildAbort(0xff));
@@ -450,16 +467,17 @@ export class OTASession {
     }
 
     // ── Step 3: Verify CRC32 ──────────────────────────────────
+    this._ensureActive();
     this.cb.onPhase?.('verify', 3);
     this._log('[3/4] Requesting CRC32 verification…');
     await sleep(500);
 
     for (const tid of activeIds) {
+      this._ensureActive();
       await this._send(buildVerify(tid));
       await sleep(50);
     }
     for (const tid of activeIds) this.cb.onTrackerStatus?.(tid, 'Verifying');
-
     const verifyExpected = new Set([OTA_STATUS_VERIFY_OK, OTA_STATUS_VERIFY_FAIL, OTA_STATUS_ERROR]);
     const verifyResults = await this._waitForMultiStatus(
       activeIds, verifyExpected, 30_000,
@@ -467,6 +485,7 @@ export class OTASession {
       3000,
     );
 
+    this._ensureActive();
     const verifiedIds = [];
     for (const tid of activeIds) {
       const st = verifyResults[tid];
@@ -490,41 +509,40 @@ export class OTASession {
     }
 
     // ── Step 4: Activate ──────────────────────────────────────
+    this._ensureActive();
     this.cb.onPhase?.('activate', 4);
     this._log(`[4/4] Activating firmware on ${verifiedIds.length} tracker(s)…`);
 
-    for (const tid of verifiedIds) {
-      await this._send(buildActivate(tid));
-      await sleep(50);
-    }
     for (const tid of verifiedIds) this.cb.onTrackerStatus?.(tid, 'Activating');
 
+    // Listen before ACTIVATE: legacy RAM engines can finish and reboot inside
+    // the former 50 ms send delay, with no later COMPLETE retransmission.
     const actExpected = new Set([OTA_STATUS_COMPLETE, OTA_STATUS_ERROR, OTA_STATUS_FLASH_ERROR]);
     const actResults = await this._waitForMultiStatus(
       verifiedIds, actExpected, 15_000,
       async (tid) => { await this._send(buildActivate(tid)); },
-      3000,
+      3000, true,
     );
+    this._ensureActive();
 
     let ok = 0;
     for (const tid of verifiedIds) {
       const st = actResults[tid];
       if (!st) {
-        this._log(`  Tracker ${tid}: No response (rebooted — OK)`);
-        this.cb.onTrackerStatus?.(tid, 'Complete');
-        ok++;
+        this._log(`  Tracker ${tid}: Activation timed out`);
+        this.cb.onTrackerStatus?.(tid, 'Timeout');
       } else if (st.status === OTA_STATUS_COMPLETE) {
         this._log(`  Tracker ${tid}: Firmware activated, rebooting!`);
         this.cb.onTrackerStatus?.(tid, 'Complete');
         ok++;
       } else {
         this._log(`  Tracker ${tid}: Activation failed (${st.statusName})`);
-        this.cb.onTrackerStatus?.(tid, st.statusName);
+        this.cb.onTrackerStatus?.(tid, st.statusName || 'Error');
       }
     }
 
     await this._send(buildAbort(0xff));
-    return ok > 0;
+    return ok === trackerIds.length;
   }
 
   // ── Receiver Self-OTA ───────────────────────────────────────────
@@ -544,7 +562,8 @@ export class OTASession {
    * trackerId = RECEIVER_OTA_ID (0xFE) in status callbacks.
    */
   async performReceiverUpdate(firmware, boardTarget) {
-    this._aborted = false;
+    this._ensureActive();
+    this._abortTarget = RECEIVER_OTA_ID;
     const totalPackets = Math.ceil(firmware.data.length / OTA_DATA_MAX_PAYLOAD);
     const imageSize = firmware.data.length;
     const tid = RECEIVER_OTA_ID;
@@ -558,9 +577,9 @@ export class OTASession {
     this.cb.onPhase?.('begin', 1);
     this._log('[1/4] Sending BEGIN to receiver…');
 
+    this._ensureActive();
     await this._send(buildBegin(tid, imageSize, firmware.crc32,
       totalPackets, boardTarget, firmware.baseAddress));
-
     const readyExpected = new Set([
       OTA_STATUS_READY, OTA_STATUS_RECEIVING,
       OTA_STATUS_BOARD_MISMATCH, OTA_STATUS_SIZE_ERROR, OTA_STATUS_ERROR,
@@ -589,13 +608,13 @@ export class OTASession {
     this.cb.onTrackerStatus?.(tid, 'Ready');
 
     // ── Step 2: Stream DATA (simple sequential) ───────────────
+    this._ensureActive();
     this.cb.onPhase?.('stream', 2);
     this._log('[2/4] Streaming firmware to receiver…');
     this.cb.onTrackerStatus?.(tid, 'Receiving');
 
     const t0 = performance.now();
     let failed = false;
-
     // Listen for error statuses during transfer
     const remove = this._addHandler((report) => {
       if (report[0] === HID_OTA_STATUS && report[1] === tid) {
@@ -639,17 +658,12 @@ export class OTASession {
 
     if (failed) return false;
 
+    this._ensureActive();
     const elapsed = (performance.now() - t0) / 1000;
     this._log(
       `Transfer complete: ${(imageSize / 1024).toFixed(1)} KB in ${elapsed.toFixed(1)}s ` +
       `(${(imageSize / elapsed / 1024).toFixed(1)} KB/s)`
     );
-
-    // ── Step 3: Verify CRC32 ──────────────────────────────────
-    this.cb.onPhase?.('verify', 3);
-    this._log('[3/4] Requesting CRC32 verification…');
-    await sleep(500);
-
     await this._send(buildVerify(tid));
     this.cb.onTrackerStatus?.(tid, 'Verifying');
 
@@ -660,6 +674,7 @@ export class OTASession {
       3000,
     );
 
+    this._ensureActive();
     const vSt = verifyResults[tid];
     if (!vSt) {
       this._log('Error: No verification response from receiver');
@@ -676,21 +691,20 @@ export class OTASession {
     this.cb.onTrackerStatus?.(tid, 'Verified');
 
     // ── Step 4: Activate ──────────────────────────────────────
+    this._ensureActive();
     this.cb.onPhase?.('activate', 4);
     this._log('[4/4] Activating new firmware…');
 
     await this._send(buildActivate(tid));
     this.cb.onTrackerStatus?.(tid, 'Activating');
 
-    // Receiver will flash-copy and reset — USB will disconnect
+    // Legacy receiver firmware resets without emitting COMPLETE before disconnect.
+    // Preserve the historical reconnect window, but aborts remain failures.
+    this._log('Receiver activation submitted; waiting for reconnect…');
     await sleep(2000);
-    this._log('Receiver is updating and rebooting…');
-    this.cb.onTrackerStatus?.(tid, 'Complete');
-
-    this._log(`\n${'═'.repeat(50)}`);
-    this._log('Receiver OTA update completed!');
-    this._log('The receiver should reboot with the new firmware.');
-    this._log(`${'═'.repeat(50)}`);
+    this._ensureActive();
+    this.cb.onTrackerStatus?.(tid, 'Reconnect Pending');
     return true;
+
   }
 }
