@@ -45,7 +45,12 @@ export async function isProxyAvailable() {
   if (_proxyAvailable !== null) return _proxyAvailable;
   try {
     const resp = await fetch('/api/proxy', { method: 'GET' });
-    _proxyAvailable = resp.ok;
+    if (!resp.ok || !resp.headers.get('content-type')?.includes('application/json')) {
+      _proxyAvailable = false;
+      return false;
+    }
+    const status = await resp.json();
+    _proxyAvailable = status?.service === 'slimenrf-ota-proxy';
   } catch {
     _proxyAvailable = false;
   }
