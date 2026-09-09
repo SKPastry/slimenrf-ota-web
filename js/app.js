@@ -5,7 +5,15 @@ import { OTASession } from './ota.js';
 import { parseUF2 } from './uf2.js';
 import { parseHex } from './hex.js';
 import { buildAbort, VID, PID, OTA_DATA_MAX_PAYLOAD, RECEIVER_OTA_ID } from './protocol.js';
-import { matchBoardTarget, matchReceiverBoardTarget, refreshOnlineMaps } from './boardmap.js';
+import {
+  compareFirmwareTarget,
+  detectFirmwareIdentity,
+  firmwareTargetKey,
+  matchBoardTarget,
+  matchReceiverBoardTarget,
+  refreshOnlineMaps,
+} from './boardmap.js';
+import { isDeveloperMode } from './dev-mode.js';
 import {
   fetchReleases, fetchCIRuns, fetchRunArtifacts,
   fetchReceiverCIRuns, fetchReceiverRunArtifacts,
@@ -45,7 +53,9 @@ function looksLikeSdPlusApp(fwData, fwBase, deviceBase) {
 Alpine.data('otaApp', () => ({
   // ── Feature detection ───────────────────────────────────────
   webHIDSupported: 'hid' in navigator,
+  webSerialSupported: 'serial' in navigator,
   secureContext: window.isSecureContext,
+  developerMode: isDeveloperMode(),
 
   // ── UI state ────────────────────────────────────────────────
   otaNoticeHidden: false,
@@ -70,8 +80,8 @@ Alpine.data('otaApp', () => ({
   _infoQueue: [],       // trackers needing info query
 
   // ── Firmware state ──────────────────────────────────────────
-  firmwareFiles: [],     // [{ id, file, raw, parsed }]
-  firmwareMapping: {},   // { [boardTarget]: firmwareFileId }
+  firmwareFiles: [],     // [{ id, file, raw, parsed, identity }]
+  firmwareMapping: {},   // { ["role:boardTarget"]: firmwareFileId }
   _nextFwId: 1,
   _activeFirmware: null, // firmware being flashed (for progress display)
 
@@ -102,6 +112,7 @@ Alpine.data('otaApp', () => ({
   batchInfo: { current: 0, total: 0, trackerIds: [] },
   updateSuccess: null,   // true/false/null
   _updateDismissTimer: null,
+  updateConfirmation: null,
 
   // ── Receiver OTA state ──────────────────────────────────────
   receiverInfo: null,           // parsed firmware info from receiver
@@ -112,6 +123,9 @@ Alpine.data('otaApp', () => ({
 
   // ── Session ─────────────────────────────────────────────────
   _session: null,
+  // Alpine expressions resolve component properties, not ES module imports.
+  formatDate,
+  formatSize,
 
   // ── Log ─────────────────────────────────────────────────────
   logs: [],
@@ -212,20 +226,12 @@ Alpine.data('otaApp', () => ({
   get canUpdate() {
     if (!this.connected || this.firmwareFiles.length === 0 || this.updating) return false;
 
-    const hasTrackerTargets = this.selectedCount > 0;
-    const hasReceiverTarget = this._hasReceiverUpdate();
-
-    // Need at least one target (tracker or receiver)
-    if (!hasTrackerTargets && !hasReceiverTarget) return false;
-
-    // Check all selected trackers with known board targets have mapped firmware
-    if (hasTrackerTargets) {
-      for (const tid of this.selectedIds) {
-        const bt = this.trackers[tid]?.info?.boardTarget;
-        if (bt && !this.firmwareMapping[bt]) return false;
-      }
-    }
-    return true;
+    const targets = this.selectedUpdateTargets;
+    if (targets.length === 0) return false;
+    return targets.every((target) => {
+      const guard = this.mappingGuard(target);
+      return guard.firmware && guard.level !== 'error';
+    });
   },
 
   get uniqueBoardTargets() {
@@ -239,30 +245,48 @@ Alpine.data('otaApp', () => ({
 
   /** Receiver board target (if known and supports self-OTA). */
   get receiverBoardTarget() {
-    if (!this.receiverInfo || this.receiverInfo.protocolVersion === 0) return null;
-    return this.receiverInfo.boardTarget || null;
+    return this.receiverInfo?.boardTarget || null;
   },
 
-  /** All board targets that need firmware mapping (tracker + receiver). */
-  get allBoardTargets() {
-    const targets = [...this.uniqueBoardTargets];
-    if (this.receiverBoardTarget && !targets.includes(this.receiverBoardTarget)) {
-      targets.push(this.receiverBoardTarget);
+  /** Role-qualified targets avoid tracker/receiver collisions such as XIAO. */
+  get updateTargets() {
+    const targets = this.uniqueBoardTargets.map((boardTarget) => ({
+      key: firmwareTargetKey('tracker', boardTarget),
+      role: 'tracker',
+      boardTarget,
+    }));
+    if (this.receiverBoardTarget) {
+      targets.push({
+        key: firmwareTargetKey('receiver', this.receiverBoardTarget),
+        role: 'receiver',
+        boardTarget: this.receiverBoardTarget,
+      });
     }
     return targets;
   },
 
-  /** Whether to show the mapping section (any board targets with firmware loaded). */
+  get selectedUpdateTargets() {
+    const targets = new Map();
+    for (const tid of this.selectedIds) {
+      const boardTarget = this.trackers[tid]?.info?.boardTarget;
+      if (!boardTarget) continue;
+      const key = firmwareTargetKey('tracker', boardTarget);
+      targets.set(key, { key, role: 'tracker', boardTarget });
+    }
+    if (this.receiverInfo && this.receiverInfo.protocolVersion !== 0 && this.receiverInfo.bootloader !== 'nrf5_opendfu') {
+      const boardTarget = this.receiverInfo.boardTarget;
+      const key = firmwareTargetKey('receiver', boardTarget);
+      const guard = this.mappingGuard({ key, role: 'receiver', boardTarget });
+      if (guard.firmware && guard.level !== 'error') targets.set(key, { key, role: 'receiver', boardTarget });
+    }
+    return [...targets.values()];
+  },
   get showMapping() {
-    return this.allBoardTargets.length > 0 && this.firmwareFiles.length > 0;
+    return this.updateTargets.length > 0 && this.firmwareFiles.length > 0;
   },
 
-  /** Check if all known board targets (tracker + receiver) are mapped. */
   get allMapped() {
-    for (const bt of this.allBoardTargets) {
-      if (!this.firmwareMapping[bt]) return false;
-    }
-    return true;
+    return this.updateTargets.every((target) => Boolean(this.firmwareMapping[target.key]));
   },
 
   get progressPercent() {
@@ -756,38 +780,35 @@ Alpine.data('otaApp', () => ({
       }
     }
   },
-
   async _addFirmware(file) {
     try {
       const raw = await file.arrayBuffer();
       let parsed = this._parseFirmware(raw, file.name);
       const id = this._nextFwId++;
-      const detectedBoard = matchBoardTarget(file.name) || matchReceiverBoardTarget(file.name);
+      const identity = detectFirmwareIdentity(file.name);
+      const detectedBoard = identity.boardTarget;
 
       // If matched to receiver and receiver flashBase is known, check compatibility
-      const isReceiverFw = detectedBoard && matchReceiverBoardTarget(file.name);
+      const isReceiverFw = identity.role === 'receiver';
       let sdPlusApp = false;
       if (isReceiverFw && this.receiverInfo && parsed.baseAddress !== this.receiverInfo.flashBase) {
         if (parsed.baseAddress > this.receiverInfo.flashBase) {
           this.log(`⚠ ${file.name}: base 0x${parsed.baseAddress.toString(16)} > receiver 0x${this.receiverInfo.flashBase.toString(16)} — requires SoftDevice not present`);
         } else if (looksLikeSdPlusApp(parsed.data, parsed.baseAddress, this.receiverInfo.flashBase)) {
-          // SD+App: re-parse to extract app only
           sdPlusApp = true;
           parsed = this._parseFirmware(raw, file.name, this.receiverInfo.flashBase);
         }
-        // Otherwise: pure app at lower base, keep as-is (cross-base update)
       } else if (!isReceiverFw && parsed.baseAddress < 0x27000) {
-        // Check tracker firmware for SD+App pattern (heuristic at common 0x27000 base)
         sdPlusApp = looksLikeSdPlusApp(parsed.data, parsed.baseAddress, 0x27000);
       }
 
-      this.firmwareFiles = [...this.firmwareFiles, { id, file, raw, parsed, detectedBoard, sdPlusApp }];
+      this.firmwareFiles = [...this.firmwareFiles, { id, file, raw, parsed, identity, detectedBoard, sdPlusApp }];
       this.log(
         `✓ Firmware loaded: ${file.name} — ` +
         `${(parsed.data.length / 1024).toFixed(1)} KB, ` +
         `CRC: 0x${parsed.crc32.toString(16).toUpperCase().padStart(8, '0')}` +
         (sdPlusApp ? ' [SD+App]' : '') +
-        (detectedBoard ? ` → ${detectedBoard}` : ''),
+        (identity.role ? ` → ${identity.role}:${detectedBoard}` : ' [target unknown]'),
       );
       this._autoMapFirmware();
       this._syncFirmwareStore();
@@ -825,6 +846,19 @@ Alpine.data('otaApp', () => ({
     return parseUF2(buffer, flashOffset);
   },
 
+  /** Save a loaded firmware file to local disk. */
+  saveFirmware(fw) {
+    const blob = new Blob([fw.raw], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fw.file.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
   removeFirmware(id) {
     const removed = this.firmwareFiles.find((f) => f.id === id);
     this.firmwareFiles = this.firmwareFiles.filter((f) => f.id !== id);
@@ -849,69 +883,51 @@ Alpine.data('otaApp', () => ({
       this.ghDownloading = newDl;
     }
   },
-
-  /** Save a loaded firmware file to local disk. */
-  saveFirmware(fw) {
-    const blob = new Blob([fw.raw], { type: 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fw.file.name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  setFirmwareMapping(target, fwId) {
+    const next = { ...this.firmwareMapping };
+    if (fwId) next[target.key] = fwId;
+    else delete next[target.key];
+    this.firmwareMapping = next;
   },
 
-  setFirmwareMapping(boardTarget, fwId) {
-    this.firmwareMapping = { ...this.firmwareMapping, [boardTarget]: fwId || undefined };
-    // Remove undefined entries
-    if (!fwId) {
-      const { [boardTarget]: _, ...rest } = this.firmwareMapping;
-      this.firmwareMapping = rest;
+  mappingGuard(target, fwId = this.firmwareMapping[target.key]) {
+    const firmware = fwId ? this._getFirmware(Number(fwId)) : null;
+    if (!firmware) return { firmware: null, level: 'error', code: 'unmapped' };
+    if (this.developerMode) return { firmware, level: 'warning', code: 'developer-bypass' };
+    return { firmware, ...compareFirmwareTarget(target.role, target.boardTarget, firmware.identity) };
+  },
+
+  mappingMessage(target, fwId = this.firmwareMapping[target.key]) {
+    const guard = this.mappingGuard(target, fwId);
+    const identity = guard.firmware?.identity;
+    switch (guard.code) {
+      case 'developer-bypass': return this.$t('fw.developerBypass');
+      case 'exact': return this.$t('fw.targetExact');
+      case 'unknown': return this.$t('fw.targetUnknown');
+      case 'mode-change': return this.$t('fw.modeChange', { target: identity.boardTarget });
+      case 'role-mismatch': return this.$t('fw.roleMismatch', { role: identity.role });
+      case 'target-mismatch': return this.$t('fw.targetMismatch', { target: identity.boardTarget });
+      case 'ambiguous': return this.$t('fw.targetAmbiguous');
+      default: return '';
     }
   },
 
-  /**
-   * Auto-map firmware to board targets.
-   * - Single firmware: map to all targets.
-   * - Multiple firmwares: map by detected board target from filename.
-   */
+  /** Auto-map only exact role + target matches. Never fan one file out to other targets. */
   _autoMapFirmware() {
-    const newMapping = {};
-    const allTargets = this.allBoardTargets;
-    const rcvTarget = this.receiverBoardTarget;
-    const trackerTargets = allTargets.filter(bt => bt !== rcvTarget);
-
-    if (this.firmwareFiles.length === 1) {
-      const fw = this.firmwareFiles[0];
-      const isReceiverFw = fw.detectedBoard && matchReceiverBoardTarget(fw.file?.name ?? '');
-      const isTrackerFw = fw.detectedBoard && matchBoardTarget(fw.file?.name ?? '');
-
-      if (isReceiverFw) {
-        // Receiver firmware → map only to receiver target
-        if (rcvTarget) newMapping[rcvTarget] = fw.id;
-      } else if (isTrackerFw) {
-        // Tracker firmware → map only to tracker targets
-        for (const bt of trackerTargets) newMapping[bt] = fw.id;
-      } else {
-        // Unknown firmware → map to all tracker targets (not receiver)
-        for (const bt of trackerTargets) newMapping[bt] = fw.id;
+    const next = {};
+    for (const target of this.updateTargets) {
+      const existing = this.firmwareMapping[target.key];
+      if (existing) {
+        const guard = this.mappingGuard(target, existing);
+        if (guard.firmware && guard.level !== 'error') next[target.key] = existing;
       }
-    } else if (this.firmwareFiles.length > 1) {
-      // Multiple firmwares → use detected board targets
-      for (const bt of allTargets) {
-        const match = this.firmwareFiles.find((fw) => fw.detectedBoard === bt);
-        if (match) {
-          newMapping[bt] = match.id;
-        } else {
-          // Keep existing mapping if any
-          if (this.firmwareMapping[bt]) newMapping[bt] = this.firmwareMapping[bt];
-        }
-      }
+      if (next[target.key]) continue;
+      const exact = this.firmwareFiles.find((fw) => (
+        fw.identity?.role === target.role && fw.identity?.boardTarget === target.boardTarget
+      ));
+      if (exact) next[target.key] = exact.id;
     }
-
-    this.firmwareMapping = newMapping;
+    this.firmwareMapping = next;
   },
 
   /** Sync loaded firmware list to the shared Alpine store for Serial DFU bridge. */
@@ -922,7 +938,9 @@ Alpine.data('otaApp', () => ({
       size: fw.raw.byteLength,
       data: fw.raw,
       format: fw.file?.name?.split('.').pop()?.toLowerCase() || 'uf2',
-      boardTarget: fw.detectedBoard || null,
+      role: fw.identity?.role || null,
+      boardTarget: fw.identity?.boardTarget || null,
+      targetAmbiguous: Boolean(fw.identity?.ambiguous),
     }));
   },
 
@@ -936,14 +954,12 @@ Alpine.data('otaApp', () => ({
     if (!this.receiverInfo) return;
     const base = this.receiverInfo.flashBase;
     for (const fw of this.firmwareFiles) {
-      const isRcv = fw.detectedBoard && matchReceiverBoardTarget(fw.file.name);
+      const isRcv = fw.identity?.role === 'receiver';
       if (isRcv && fw.parsed.baseAddress !== base) {
         if (fw.parsed.baseAddress > base) {
-          // fw.baseAddress > device base — firmware needs SoftDevice not present
           fw.sdPlusApp = false;
           this.log(`⚠ ${fw.file.name}: base 0x${fw.parsed.baseAddress.toString(16)} > receiver 0x${base.toString(16)} — requires SoftDevice not present`);
         } else if (looksLikeSdPlusApp(fw.parsed.data, fw.parsed.baseAddress, base)) {
-          // SD+App: re-parse to extract app only
           fw.sdPlusApp = true;
           try {
             fw.parsed = this._parseFirmware(fw.raw, fw.file.name, base);
@@ -952,17 +968,48 @@ Alpine.data('otaApp', () => ({
             this.log(`⚠ Cannot extract app from ${fw.file.name}: ${e.message}`);
           }
         } else {
-          // Pure app at lower base: cross-base update, keep as-is
           fw.sdPlusApp = false;
           this.log(`${fw.file.name}: cross-base update (fw:0x${fw.parsed.baseAddress.toString(16)} → rcv:0x${base.toString(16)})`);
         }
       } else if (isRcv) {
-        // Same base — re-evaluate sdPlusApp flag (may have been set speculatively before connection)
         fw.sdPlusApp = false;
       }
     }
-    // Trigger reactivity
     this.firmwareFiles = [...this.firmwareFiles];
+  },
+
+  _targetFor(role, boardTarget) {
+    return { key: firmwareTargetKey(role, boardTarget), role, boardTarget };
+  },
+
+  _confirmationItems(targets) {
+    return targets.map((target) => {
+      const guard = this.mappingGuard(target);
+      return {
+        ...target,
+        firmware: guard.firmware,
+        level: guard.level,
+        code: guard.code,
+        message: this.mappingMessage(target),
+      };
+    });
+  },
+
+  requestUpdate() {
+    if (!this.canUpdate) return;
+    const items = this._confirmationItems(this.selectedUpdateTargets);
+    if (items.some((item) => item.level === 'error')) return;
+    this.updateConfirmation = { items };
+  },
+
+  cancelUpdateConfirmation() {
+    this.updateConfirmation = null;
+  },
+
+  confirmUpdate() {
+    if (!this.updateConfirmation) return;
+    this.updateConfirmation = null;
+    this.startUpdate();
   },
 
   // ── Update Flow ─────────────────────────────────────────────
@@ -972,7 +1019,7 @@ Alpine.data('otaApp', () => ({
 
     const ids = this.selectedIds;
     this.updating = true;
-    this.updateSuccess = null;
+    this._session.beginUpdate();
     clearTimeout(this._updateDismissTimer);
     this.updatePhase = '';
     this.updateStep = 0;
@@ -984,6 +1031,7 @@ Alpine.data('otaApp', () => ({
       const boardGroups = {};
 
       for (const tid of ids) {
+        this._session._ensureActive();
         const cached = this.trackers[tid]?.info;
         const info = cached || await this._session.queryInfo(tid);
         if (!info || !info.boardTarget) {
@@ -1006,33 +1054,24 @@ Alpine.data('otaApp', () => ({
       // Build batch plan with per-target firmware
       const plan = [];
       for (const [bt, group] of Object.entries(boardGroups)) {
-        const fwId = this.firmwareMapping[bt];
-        const fwEntry = fwId ? this._getFirmware(fwId) : null;
-        if (!fwEntry) {
-          this.log(`✗ No firmware mapped for board target: ${bt}, skipping ${group.tids.length} tracker(s)`);
+        const target = this._targetFor('tracker', bt);
+        const guard = this.mappingGuard(target);
+        const fwEntry = guard.firmware;
+        if (!fwEntry || guard.level === 'error') {
+          this.log(`✗ Invalid firmware mapping for tracker target: ${bt}`);
           continue;
         }
 
         let fw = fwEntry.parsed;
-
-        // Determine effective device base: use reported flashBase, or infer from sdPlusApp flag
         let deviceBase = group.info.flashBase;
-        if (deviceBase === 0 && fwEntry.sdPlusApp) {
-          // Tracker doesn't report flashBase (old firmware) but we detected SD+App at load time.
-          // Use 0x27000 as the standard SoftDevice app base for extraction.
-          deviceBase = 0x27000;
-        }
+        if (deviceBase === 0 && fwEntry.sdPlusApp) deviceBase = 0x27000;
 
-        // Check flash base mismatch
         if (deviceBase !== 0 && fw.baseAddress !== deviceBase) {
           if (fw.baseAddress > deviceBase) {
-            // Firmware expects SoftDevice that isn't present — block
             this.log(`✗ Firmware base 0x${fw.baseAddress.toString(16).padStart(5, '0')} > tracker base 0x${deviceBase.toString(16).padStart(5, '0')} — firmware requires SoftDevice not present. Skipping ${bt}.`);
             continue;
           }
-          // fw.baseAddress < device base: check if SD+App or pure app
           if (looksLikeSdPlusApp(fw.data, fw.baseAddress, deviceBase)) {
-            // SD+App image: re-parse to extract only the application portion
             this.log(`Detected SD+App image, extracting app at 0x${deviceBase.toString(16).padStart(5, '0')}…`);
             try {
               fw = this._parseFirmware(fwEntry.raw, fwEntry.file.name, deviceBase);
@@ -1042,7 +1081,6 @@ Alpine.data('otaApp', () => ({
               continue;
             }
           } else {
-            // Pure app at lower base: cross-base update (removing SoftDevice), use as-is
             this.log(`Cross-base update: firmware at 0x${fw.baseAddress.toString(16).padStart(5, '0')}, tracker at 0x${deviceBase.toString(16).padStart(5, '0')} — proceeding`);
           }
         }
@@ -1066,6 +1104,7 @@ Alpine.data('otaApp', () => ({
       // Execute tracker batches
       let allOk = true;
       for (let b = 0; b < plan.length; b++) {
+        this._session._ensureActive();
         const { boardTarget, ids: batchIds, firmware: fw } = plan[b];
         this.batchInfo = { current: b + 1, total: plan.length, trackerIds: batchIds };
         this.progress = { consumed: 0, total: 1, speed: 0, inFlight: 0 };
@@ -1075,15 +1114,19 @@ Alpine.data('otaApp', () => ({
         if (!ok) allOk = false;
 
         // Brief pause between batches
-        if (b + 1 < plan.length) await new Promise((r) => setTimeout(r, 2000));
+        if (b + 1 < plan.length) {
+          await new Promise((r) => setTimeout(r, 2000));
+          this._session._ensureActive();
+        }
       }
 
-      // After all tracker batches, update receiver if mapped
+      this._session._ensureActive();
       if (allOk && this._hasReceiverUpdate()) {
         if (plan.length > 0) {
           this.log('Tracker updates complete. Updating receiver…');
           await new Promise((r) => setTimeout(r, 2000));
         }
+        this._session._ensureActive();
         const rcvOk = await this._performReceiverOTA();
         if (!rcvOk) allOk = false;
       }
@@ -1114,13 +1157,13 @@ Alpine.data('otaApp', () => ({
       }
       this.updateSuccess = false;
       this._activeFirmware = null;
-      try { await this._session._send(buildAbort(0xff)); } catch {}
+      this._session.abort();
+      await this._session._abortPromise;
     } finally {
       this.updating = false;
       this.receiverUpdating = false;
     }
   },
-
   async abortUpdate() {
     if (!this._session) return;
     this._session.abort();
@@ -1219,35 +1262,30 @@ Alpine.data('otaApp', () => ({
   /** Check if receiver firmware is mapped and supports self-OTA. */
   _hasReceiverUpdate() {
     if (!this.receiverInfo) return false;
-    if (this.receiverInfo.protocolVersion === 0) return false; // self-OTA not supported
-    if (this.receiverInfo.bootloader === 'nrf5_opendfu') return false; // ACL-protected
-    const bt = this.receiverInfo.boardTarget;
-    return bt && this.firmwareMapping[bt] && this._getFirmware(this.firmwareMapping[bt]);
+    if (this.receiverInfo.protocolVersion === 0) return false;
+    if (this.receiverInfo.bootloader === 'nrf5_opendfu') return false;
+    const target = this._targetFor('receiver', this.receiverInfo.boardTarget);
+    const guard = this.mappingGuard(target);
+    return guard.firmware && guard.level !== 'error';
   },
 
   /** Perform receiver OTA update (used by unified update flow). */
   async _performReceiverOTA() {
     const bt = this.receiverInfo.boardTarget;
-    const fwId = this.firmwareMapping[bt];
-    const fwEntry = this._getFirmware(fwId);
-    if (!fwEntry) return false;
+    const target = this._targetFor('receiver', bt);
+    const guard = this.mappingGuard(target);
+    const fwEntry = guard.firmware;
+    if (!fwEntry || guard.level === 'error') return false;
 
     let fw = fwEntry.parsed;
-
-    // Determine effective device base: use reported flashBase, or infer from sdPlusApp flag
     let deviceBase = this.receiverInfo.flashBase;
-    if (deviceBase === 0 && fwEntry.sdPlusApp) {
-      deviceBase = 0x27000;
-    }
+    if (deviceBase === 0 && fwEntry.sdPlusApp) deviceBase = 0x27000;
 
-    // Check flash base mismatch
     if (deviceBase !== 0 && fw.baseAddress !== deviceBase) {
       if (fw.baseAddress > deviceBase) {
-        // Firmware expects SoftDevice that isn't present — block
         this.log(`✗ Firmware base 0x${fw.baseAddress.toString(16).padStart(5, '0')} > receiver base 0x${deviceBase.toString(16).padStart(5, '0')} — firmware requires SoftDevice not present.`);
         return false;
       }
-      // fw.baseAddress < device base: check if SD+App or pure app
       if (looksLikeSdPlusApp(fw.data, fw.baseAddress, deviceBase)) {
         this.log(`Detected SD+App image, extracting app at 0x${deviceBase.toString(16).padStart(5, '0')}…`);
         try {
@@ -1258,7 +1296,6 @@ Alpine.data('otaApp', () => ({
           return false;
         }
       } else {
-        // Pure app at lower base: cross-base update (removing SoftDevice), use as-is
         this.log(`Cross-base update: firmware at 0x${fw.baseAddress.toString(16).padStart(5, '0')}, receiver at 0x${deviceBase.toString(16).padStart(5, '0')} — proceeding`);
       }
     }
@@ -1269,11 +1306,7 @@ Alpine.data('otaApp', () => ({
 
     try {
       const ok = await this._session.performReceiverUpdate(fw, bt);
-      if (ok) {
-        this.log('✓ Receiver OTA update completed');
-      } else {
-        this.log('✗ Receiver OTA update failed');
-      }
+      this.log(ok ? 'Receiver activation submitted; reconnect to confirm firmware.' : 'Receiver OTA update failed');
       return ok;
     } catch (e) {
       this.log(`✗ Receiver OTA error: ${e.message}`);
@@ -1283,66 +1316,24 @@ Alpine.data('otaApp', () => ({
     }
   },
 
-  /** Standalone receiver update (from button). */
+  /** Standalone receiver update (kept for callers outside the unified card). */
   async startReceiverUpdate() {
-    if (!this._session || !this.receiverInfo) return;
-    if (this.receiverInfo.protocolVersion === 0) {
-      this.log('✗ Receiver does not support self-OTA. Flash via UF2/DFU instead.');
-      return;
-    }
-    if (this.receiverInfo.bootloader === 'nrf5_opendfu') {
-      this.log('✗ Receiver has nRF5 OpenDFU bootloader — self-OTA is blocked due to ACL flash write-protection. Use SWD or DFU to update.');
-      return;
-    }
-
-    const bt = this.receiverInfo.boardTarget;
-    if (!this._hasReceiverUpdate()) {
-      this.log(`✗ No firmware mapped for receiver board target: ${bt}`);
-      return;
-    }
-
-    const fwEntry = this._getFirmware(this.firmwareMapping[bt]);
-    const fw = fwEntry.parsed;
-    if (!confirm(`Update receiver firmware?\n\nBoard: ${bt}\nSize: ${(fw.data.length / 1024).toFixed(1)} KB\nCRC: 0x${fw.crc32.toString(16).toUpperCase().padStart(8, '0')}\n\nThe receiver will reboot after update.`)) {
-      return;
-    }
-
-    this.updating = true;
-    this.updatePhase = 'begin';
-    this.updateStep = 1;
-    this.trackerStatuses = {};
-    this.updateSuccess = null;
-
-    try {
-      const ok = await this._performReceiverOTA();
-      this.updateSuccess = ok;
-      this.updatePhase = 'complete';
-      this.updateStep = 5;
-      if (ok) {
-        clearTimeout(this._updateDismissTimer);
-        this._updateDismissTimer = setTimeout(() => { this.updateSuccess = null; }, 8000);
-      }
-    } catch (e) {
-      this.log(`✗ Receiver OTA error: ${e.message}`);
-      this.updateSuccess = false;
-    } finally {
-      this.updating = false;
-    }
+    if (!this._session || !this.receiverInfo || !this._hasReceiverUpdate()) return;
+    this.updateConfirmation = {
+      items: this._confirmationItems([
+        this._targetFor('receiver', this.receiverInfo.boardTarget),
+      ]),
+    };
   },
 
   // ── GitHub Downloads ──────────────────────────────────────────
 
-  formatDate,
-  formatSize,
-
   async ghLoadReleases() {
-    if (this.ghReleases.length > 0) return; // already loaded
+    if (this.ghReleases.length > 0) return;
     this.ghLoading = true;
     try {
       this.ghReleases = await fetchReleases();
-      if (this.ghReleases.length > 0) {
-        this.ghSelectedRelease = this.ghReleases[0].tag;
-      }
+      if (this.ghReleases.length > 0) this.ghSelectedRelease = this.ghReleases[0].tag;
       this.log(`Loaded ${this.ghReleases.length} release(s) from GitHub`);
     } catch (e) {
       this.log(`✗ Failed to load releases: ${e.message}`);
@@ -1545,13 +1536,10 @@ Alpine.data('otaApp', () => ({
       });
 
       if (uf2Files) {
-        for (const uf2 of uf2Files) {
-          await this._addFirmwareFromBuffer(uf2.data, uf2.name);
-        }
+        for (const uf2 of uf2Files) await this._addFirmwareFromBuffer(uf2.data, uf2.name);
         this.ghDownloading = { ...this.ghDownloading, [key]: { progress: 1, error: null, done: true } };
         this.log(`✓ Downloaded and extracted: ${artifact.name} (${uf2Files.length} file(s))`);
       } else {
-        // CORS blocked — open nightly.link page in new tab
         openDownloadUrl(artifact.downloadUrl.replace(/\.zip$/, ''));
         this.ghDownloading = { ...this.ghDownloading, [key]: { progress: 0, error: null, fallback: true } };
         this.log(`Opening download link for ${artifact.name} (CORS restricted, drop .zip file to load)`);
@@ -1567,33 +1555,29 @@ Alpine.data('otaApp', () => ({
     try {
       let parsed = this._parseFirmware(buffer, name);
       const id = this._nextFwId++;
-      const detectedBoard = matchBoardTarget(name) || matchReceiverBoardTarget(name);
-
-      // If matched to receiver and receiver flashBase is known, check compatibility
-      const isReceiverFw = detectedBoard && matchReceiverBoardTarget(name);
+      const identity = detectFirmwareIdentity(name);
+      const detectedBoard = identity.boardTarget;
+      const isReceiverFw = identity.role === 'receiver';
       let sdPlusApp = false;
       if (isReceiverFw && this.receiverInfo && parsed.baseAddress !== this.receiverInfo.flashBase) {
         if (parsed.baseAddress > this.receiverInfo.flashBase) {
           this.log(`⚠ ${name}: base 0x${parsed.baseAddress.toString(16)} > receiver 0x${this.receiverInfo.flashBase.toString(16)} — requires SoftDevice not present`);
         } else if (looksLikeSdPlusApp(parsed.data, parsed.baseAddress, this.receiverInfo.flashBase)) {
-          // SD+App: re-parse to extract app only
           sdPlusApp = true;
           parsed = this._parseFirmware(buffer, name, this.receiverInfo.flashBase);
         }
-        // Otherwise: pure app at lower base, keep as-is (cross-base update)
       } else if (!isReceiverFw && parsed.baseAddress < 0x27000) {
-        // Check tracker firmware for SD+App pattern (heuristic at common 0x27000 base)
         sdPlusApp = looksLikeSdPlusApp(parsed.data, parsed.baseAddress, 0x27000);
       }
 
       const file = { name, size: buffer.byteLength };
-      this.firmwareFiles = [...this.firmwareFiles, { id, file, raw: buffer, parsed, detectedBoard, sdPlusApp }];
+      this.firmwareFiles = [...this.firmwareFiles, { id, file, raw: buffer, parsed, identity, detectedBoard, sdPlusApp }];
       this.log(
         `✓ Firmware loaded: ${name} — ` +
         `${(parsed.data.length / 1024).toFixed(1)} KB, ` +
         `CRC: 0x${parsed.crc32.toString(16).toUpperCase().padStart(8, '0')}` +
         (sdPlusApp ? ' [SD+App]' : '') +
-        (detectedBoard ? ` → ${detectedBoard}` : ''),
+        (identity.role ? ` → ${identity.role}:${detectedBoard}` : ' [target unknown]'),
       );
       this._autoMapFirmware();
       this._syncFirmwareStore();

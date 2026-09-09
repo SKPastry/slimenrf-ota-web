@@ -72,11 +72,13 @@ export class SerialDfu {
    * @param {function} [options.onProgress] - (percent, phase, detail) => void
    * @param {function} [options.onLog] - (message) => void
    * @param {string} [options.protocol] - force protocol ('adafruit' or 'nordic')
+   * @param {function} [options.onPreflight] - async ({ protocol, usbVendorId, usbProductId }) => boolean
    */
   constructor(options = {}) {
     this._onProgress = options.onProgress ?? (() => {});
     this._onLog = options.onLog ?? (() => {});
     this._protocol = options.protocol ?? null;
+    this._onPreflight = options.onPreflight ?? (async () => true);
     this._dfu = null;
     this._port = null;
   }
@@ -129,6 +131,18 @@ export class SerialDfu {
         await this._port.close();
       }
       this._onLog(`Detected protocol: ${activeProtocol}`);
+    }
+
+    const portInfo = this._port.getInfo?.() ?? {};
+    const approved = await this._onPreflight({
+      protocol: activeProtocol,
+      usbVendorId: portInfo.usbVendorId ?? null,
+      usbProductId: portInfo.usbProductId ?? null,
+    });
+    if (!approved) {
+      this._onLog('Serial DFU cancelled before flash');
+      this._port = null;
+      return false;
     }
 
     // Prepare firmware package

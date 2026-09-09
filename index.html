@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Update SlimeNRF tracker and receiver firmware from a Chromium browser using WebHID and Web Serial.">
+  <meta name="description" content="Update SlimeNRF tracker and receiver firmware using WebHID or Web Serial.">
   <meta name="color-scheme" content="dark light">
   <title>SlimeNRF OTA Updater</title>
 
@@ -52,9 +52,19 @@
        Main content
        ═══════════════════════════════════════════════════════════════ -->
   <main class="flex-1 container mx-auto max-w-7xl p-4 space-y-4">
+    <template x-if="developerMode">
+      <div class="alert alert-error shadow-lg">
+        <svg class="w-6 h-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div>
+          <p class="font-semibold" x-text="$t('dev.title')"></p>
+          <p class="text-sm" x-text="$t('dev.warning')"></p>
+        </div>
+      </div>
+    </template>
 
-    <!-- WebHID not supported -->
-    <template x-if="!webHIDSupported">
+
+    <!-- Browser capability notice -->
+    <template x-if="!webHIDSupported && !webSerialSupported">
       <div class="alert alert-warning shadow-lg">
         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         <div>
@@ -63,6 +73,16 @@
         </div>
       </div>
     </template>
+    <template x-if="!webHIDSupported && webSerialSupported">
+      <div class="alert alert-info shadow-lg">
+        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div>
+          <p class="font-semibold" x-text="$t('webhid.notSupported')"></p>
+          <p class="text-sm" x-text="$t('webhid.serialAvailable')"></p>
+        </div>
+      </div>
+    </template>
+
 
     <!-- ─── Connection Card ────────────────────────────────────── -->
     <div class="card bg-base-100 shadow-md" x-show="webHIDSupported">
@@ -752,7 +772,7 @@
           </template>
         </div>
 
-        <!-- Board target → Firmware mapping -->
+        <!-- Role + board target → firmware mapping -->
         <template x-if="showMapping">
           <div class="mt-3">
             <div class="flex items-center justify-between mb-2">
@@ -761,24 +781,25 @@
                     x-text="allMapped ? $t('fw.allMapped') : $t('fw.unmappedTargets')"></span>
             </div>
             <div class="space-y-1.5">
-              <template x-for="bt in allBoardTargets" :key="bt">
-                <div class="flex items-center gap-2 bg-base-200 rounded-lg px-3 py-2">
-                  <span class="text-xs font-mono shrink-0" x-text="bt"></span>
-                  <template x-if="bt === receiverBoardTarget">
-                    <span class="badge badge-warning badge-xs shrink-0">receiver</span>
+              <template x-for="target in updateTargets" :key="target.key">
+                <div class="bg-base-200 rounded-lg px-3 py-2 space-y-1">
+                  <div class="flex items-center gap-2">
+                    <span class="badge badge-xs shrink-0" :class="target.role === 'receiver' ? 'badge-warning' : 'badge-ghost'" x-text="target.role"></span>
+                    <span class="text-xs font-mono shrink-0" x-text="target.boardTarget"></span>
+                    <select class="select select-bordered select-xs min-w-0 flex-1"
+                            :value="firmwareMapping[target.key] || ''"
+                            @change="setFirmwareMapping(target, Number($event.target.value) || null)">
+                      <option value="" x-text="$t('fw.selectFirmware')"></option>
+                      <template x-for="fw in firmwareFiles" :key="fw.id">
+                        <option :value="fw.id" x-text="fw.file.name" :selected="firmwareMapping[target.key] === fw.id"></option>
+                      </template>
+                    </select>
+                  </div>
+                  <template x-if="firmwareMapping[target.key] && mappingGuard(target).code !== 'exact'">
+                    <div class="alert alert-sm py-1 px-2" :class="mappingGuard(target).level === 'error' ? 'alert-error' : 'alert-warning'">
+                      <span class="text-xs" x-text="mappingMessage(target)"></span>
+                    </div>
                   </template>
-                  <template x-if="bt !== receiverBoardTarget">
-                    <span class="badge badge-ghost badge-xs shrink-0"
-                          x-text="onlineTrackerIds.filter(tid => trackers[tid]?.info?.boardTarget === bt).length + ' tracker(s)'"></span>
-                  </template>
-                  <select class="select select-bordered select-xs min-w-0 flex-1"
-                          :value="firmwareMapping[bt] || ''"
-                          @change="setFirmwareMapping(bt, Number($event.target.value) || null)">
-                    <option value="" x-text="$t('fw.selectFirmware')"></option>
-                    <template x-for="fw in firmwareFiles" :key="fw.id">
-                      <option :value="fw.id" x-text="fw.file.name" :selected="firmwareMapping[bt] === fw.id"></option>
-                    </template>
-                  </select>
                 </div>
               </template>
             </div>
@@ -809,7 +830,7 @@
                 <span class="text-xs" x-text="$t('update.trackersFirstThenReceiver')"></span>
               </div>
             </template>
-            <template x-if="receiverInfo && (receiverInfo.protocolVersion === 0 || receiverInfo.bootloader === 'nrf5_opendfu') && receiverInfo.boardTarget && firmwareMapping[receiverInfo.boardTarget]">
+            <template x-if="receiverInfo && (receiverInfo.protocolVersion === 0 || receiverInfo.bootloader === 'nrf5_opendfu') && receiverInfo.boardTarget && firmwareMapping['receiver:' + receiverInfo.boardTarget]">
               <div class="alert alert-warning alert-sm py-1 px-3">
                 <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span class="text-xs" x-text="receiverInfo.bootloader === 'nrf5_opendfu'
@@ -820,7 +841,7 @@
             <div class="flex gap-2 items-center flex-wrap">
               <button class="btn btn-primary gap-2"
                       :disabled="!canUpdate"
-                      @click="startUpdate()">
+                      @click="requestUpdate()">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                 <span x-text="$t('update.startUpdate')"></span>
               </button>
@@ -833,6 +854,32 @@
             <p class="text-xs opacity-40" x-show="!canUpdate && firmwareFiles.length === 0" x-text="$t('update.selectFirmwareFirst')"></p>
             <p class="text-xs opacity-40" x-show="!canUpdate && firmwareFiles.length > 0 && selectedCount === 0 && !_hasReceiverUpdate()" x-text="$t('update.selectTrackersOrReceiver')"></p>
             <p class="text-xs opacity-40" x-show="!canUpdate && firmwareFiles.length > 0 && selectedCount > 0 && !allMapped" x-text="$t('update.mapAllTargets')"></p>
+          </div>
+        </template>
+
+        <!-- Final host-side OTA confirmation -->
+        <template x-if="updateConfirmation">
+          <div class="modal modal-open">
+            <div class="modal-box max-w-2xl">
+              <h3 class="font-bold text-lg" x-text="$t('update.confirmTitle')"></h3>
+              <div class="alert alert-warning mt-3">
+                <span class="text-sm" x-text="$t('update.confirmWarning')"></span>
+              </div>
+              <div class="space-y-2 mt-3">
+                <template x-for="item in updateConfirmation.items" :key="item.key">
+                  <div class="bg-base-200 rounded-lg px-3 py-2 text-sm">
+                    <div class="font-mono" x-text="item.role + ':' + item.boardTarget"></div>
+                    <div class="truncate" x-text="item.firmware.file.name"></div>
+                    <div class="text-xs mt-1" :class="item.level === 'warning' ? 'text-warning' : 'text-success'" x-text="item.message"></div>
+                  </div>
+                </template>
+              </div>
+              <div class="modal-action">
+                <button class="btn" @click="cancelUpdateConfirmation()" x-text="$t('update.cancel')"></button>
+                <button class="btn btn-warning" @click="confirmUpdate()" x-text="$t('update.confirmFlash')"></button>
+              </div>
+            </div>
+            <div class="modal-backdrop" @click="cancelUpdateConfirmation()"></div>
           </div>
         </template>
 
@@ -1000,25 +1047,78 @@
               </div>
             </template>
 
+            <!-- Web Serial cannot read a SlimeNRF board target. Require physical verification outside developer mode. -->
+            <template x-if="dfuFile && dfuState === 'idle'">
+              <div class="rounded-lg border p-3 text-base-content"
+                   :class="developerMode ? 'border-error/50 bg-error/15' : 'border-warning/50 bg-warning/15'">
+                <div class="w-full space-y-3">
+                  <div class="text-sm font-semibold text-base-content" x-text="developerMode ? $t('dfu.developerModeTitle') : $t('dfu.modelRequired')"></div>
+                  <div class="text-xs leading-relaxed text-base-content/80" x-text="developerMode ? $t('dfu.developerModeDetail') : $t('dfu.modelRequiredDetail')"></div>
+                  <template x-if="!developerMode">
+                    <label class="form-control w-full gap-1.5">
+                      <span class="label-text text-xs font-medium text-base-content/90" x-text="$t('dfu.expectedTarget')"></span>
+                      <div class="flex flex-col gap-2 sm:flex-row">
+                        <select class="select select-bordered select-sm w-full bg-base-100 text-base-content sm:w-36" x-model="dfuExpectedRole">
+                          <option value="" x-text="$t('dfu.selectRole')"></option>
+                          <option value="tracker" x-text="$t('gh.tracker')"></option>
+                          <option value="receiver" x-text="$t('gh.receiver')"></option>
+                        </select>
+                        <input class="input input-bordered input-sm min-w-0 flex-1 bg-base-100 font-mono text-base-content placeholder:text-base-content/50" type="text"
+                               x-model="dfuExpectedTarget" :placeholder="$t('dfu.expectedTargetPlaceholder')">
+                      </div>
+                    </label>
+                  </template>
+                  <template x-if="developerMode || (dfuExpectedRole && dfuExpectedTarget.trim())">
+                    <div class="rounded-md px-2 py-1 text-xs font-medium"
+                         :class="dfuTargetGuard.level === 'error' ? 'bg-error text-error-content' : (dfuTargetGuard.level === 'warning' ? 'bg-warning text-warning-content' : 'bg-success text-success-content')"
+                         x-text="dfuTargetGuardMessage"></div>
+                  </template>
+                </div>
+              </div>
+            </template>
+
             <!-- Action buttons -->
-            <div class="flex gap-2 items-center">
+            <div class="mt-2 flex gap-2 items-center">
               <template x-if="dfuState === 'idle'">
                 <button class="btn btn-primary btn-sm gap-2"
-                        :disabled="!dfuFile"
+                        :disabled="!dfuFile || (!developerMode && dfuTargetGuard.level === 'error')"
                         @click="dfuStart()">
                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                   <span x-text="$t('dfu.flashViaSerial')"></span>
                 </button>
               </template>
-
               <template x-if="dfuState === 'running'">
-                <button class="btn btn-error btn-sm btn-outline gap-2"
-                        @click="dfuAbort()">
+                <button class="btn btn-error btn-sm btn-outline gap-2" @click="dfuAbort()">
                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                   <span x-text="$t('dfu.abort')"></span>
                 </button>
               </template>
             </div>
+
+            <!-- Second confirmation after selecting the serial port/protocol, before flash. -->
+            <template x-if="dfuConfirmation">
+              <div class="modal modal-open">
+                <div class="modal-box max-w-xl">
+                  <h3 class="font-bold text-lg" x-text="$t('dfu.confirmTitle')"></h3>
+                  <div class="alert alert-error mt-3"><span class="text-sm" x-text="$t('dfu.confirmWarning')"></span></div>
+                  <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm mt-3">
+                    <dt class="opacity-60" x-text="$t('dfu.firmware')"></dt><dd class="font-mono break-all" x-text="dfuConfirmation.firmwareName"></dd>
+                    <dt class="opacity-60" x-text="$t('dfu.firmwareTarget')"></dt><dd class="font-mono" x-text="dfuConfirmation.firmwareTarget || $t('dfu.unknownTarget')"></dd>
+                    <dt class="opacity-60" x-text="$t('dfu.protocol')"></dt><dd x-text="dfuConfirmation.protocol"></dd>
+                    <dt class="opacity-60">USB VID:PID</dt><dd class="font-mono" x-text="(dfuConfirmation.usbVendorId ?? 0).toString(16).padStart(4, '0') + ':' + (dfuConfirmation.usbProductId ?? 0).toString(16).padStart(4, '0')"></dd>
+                  </dl>
+                  <label class="form-control mt-3">
+                    <span class="label-text text-xs" x-text="$t('dfu.typeTargetAgain', { target: dfuConfirmation.expectedIdentity })"></span>
+                    <input class="input input-bordered font-mono" type="text" x-model="dfuModelConfirmation" autocomplete="off">
+                  </label>
+                  <div class="modal-action">
+                    <button class="btn" @click="cancelDfuConfirmation()" x-text="$t('update.cancel')"></button>
+                    <button class="btn btn-error" :disabled="dfuModelConfirmation.trim() !== dfuConfirmation.expectedIdentity" @click="approveDfuConfirmation()" x-text="$t('dfu.confirmFlash')"></button>
+                  </div>
+                </div>
+                <div class="modal-backdrop" @click="cancelDfuConfirmation()"></div>
+              </div>
+            </template>
 
             <!-- Progress -->
             <template x-if="dfuState === 'running'">

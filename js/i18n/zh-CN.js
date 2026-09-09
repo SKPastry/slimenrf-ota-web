@@ -3,10 +3,16 @@ export default {
   // ── 应用标题 ──────────────────────────────────────────
   title: 'SlimeNRF OTA 更新工具',
 
+  dev: {
+    title: '已启用开发者模式',
+    warning: '板型和角色验证已禁用。任意已加载固件都可映射或刷写到任意 target。',
+  },
+
   // ── WebHID 不支持 ─────────────────────────────────────
   webhid: {
     notSupported: '不支持 WebHID',
     useChrome: '请使用 {chrome}、{edge} 或 {opera} 来使用 WebHID。',
+    serialAvailable: 'WebHID OTA 不可用，但可以使用下方的串口 DFU 刷写。',
   },
 
   // ── 连接卡片 ──────────────────────────────────────────
@@ -94,6 +100,13 @@ export default {
     allMapped: '全部已映射',
     unmappedTargets: '存在未映射目标',
     selectFirmware: '— 选择固件 —',
+    targetExact: '固件 target 与设备 target 完全匹配。',
+    developerBypass: '开发者模式：已绕过 target 验证。',
+    targetUnknown: '文件名无法识别已知 target。刷写前必须手动确认该固件。',
+    modeChange: '检测到已知模式变更：固件 target 为 {target}。请确认硬件接线和传感器总线模式。',
+    roleMismatch: '已阻止：这是{role}固件，不属于该设备角色。',
+    targetMismatch: '已阻止：固件 target {target} 与设备 target 不匹配。',
+    targetAmbiguous: '已阻止：文件名同时匹配多个固件角色。',
   },
 
   // ── 更新卡片 ──────────────────────────────────────────
@@ -116,6 +129,10 @@ export default {
     checkLog: '请查看日志了解详情。失败的追踪器将重启到引导程序。',
     scanAgain: '重新扫描',
     dismiss: '关闭',
+    confirmTitle: '确认固件目标',
+    confirmWarning: '请逐项核对设备 target 与固件文件。错误 target 可能导致设备必须通过 USB 恢复。',
+    cancel: '取消',
+    confirmFlash: 'target 正确，开始刷写',
   },
 
   // ── 串口 DFU 卡片 ─────────────────────────────────────
@@ -124,7 +141,7 @@ export default {
     usb: 'USB',
     description: '通过 USB 串口直接刷写固件 — 设备须处于 DFU/引导程序模式（双击重置或输入 {cmd} 命令）',
     webSerialNotSupported: '不支持 Web Serial',
-    webSerialRequires: 'Web Serial API 需要 Chrome 89+、Edge 89+ 或 Opera 76+。',
+    webSerialRequires: '此浏览器不提供 Web Serial API。',
     protocol: '协议',
     autoDetect: '自动检测',
     adafruit: 'Adafruit（传统）',
@@ -137,6 +154,27 @@ export default {
     abort: '中止',
     dfuComplete: 'DFU 完成！',
     dfuFailed: 'DFU 失败',
+    developerModeTitle: '开发者模式：已禁用串口 target 验证',
+    developerModeDetail: '不会要求输入实物 target 或进行第二次文本确认。所选固件将直接发送给选择的串口设备。',
+    developerBypass: '开发者模式：已绕过角色和 target 检查。',
+    modelRequired: '串口 DFU 无法验证设备型号。',
+    modelRequiredDetail: '请输入您在设备实物上核对的完整 target。这是第一次确认；当前引导程序不会报告可信型号。',
+    expectedTarget: '实物核对后的设备 target',
+    expectedTargetPlaceholder: '例如：promicro_uf2/nrf52840/spi',
+    confirmTitle: '再次确认串口 DFU target',
+    selectRole: '角色',
+    targetExact: '固件角色和 target 与当前选择匹配。',
+    targetUnknown: '无法从文件名识别 target。仅在手动核对文件后继续。',
+    modeChange: '检测到固件 target {target} 的已知模式变更。请确认接线和传感器总线模式。',
+    roleMismatch: '已阻止：所选角色与该{role}固件不匹配。',
+    targetMismatch: '已阻止：固件 target {target} 与输入的 target 不匹配。',
+    targetAmbiguous: '已阻止：文件名同时匹配多个固件角色。',
+    confirmWarning: '所选串口只能提供 USB VID/PID 和 DFU 协议，不能证明板型。错误镜像可能需要通过 USB/SWD 恢复。',
+    firmware: '固件',
+    firmwareTarget: '文件名 target',
+    unknownTarget: '未知——必须手动核对文件',
+    typeTargetAgain: '再次输入 {target}，确认设备实物型号正确。',
+    confirmFlash: '型号已确认，开始刷写',
     dfuLog: 'DFU 日志',
   },
 

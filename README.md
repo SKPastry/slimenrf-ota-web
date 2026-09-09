@@ -29,9 +29,8 @@ maintained by `SKPastry`.
 
 ## Browser Support
 
-WebHID requires a Chromium-based browser:
-- ✅ Chrome 89+ / Edge 89+ / Opera 75+
-- ❌ Firefox / Safari (no WebHID support)
+- WebHID OTA requires a Chromium-based browser such as Chrome, Edge, or Opera.
+- Serial DFU works independently in browsers that provide Web Serial, including Firefox builds with Web Serial support.
 
 ## Development
 
@@ -39,6 +38,8 @@ WebHID requires a Chromium-based browser:
 pnpm install
 pnpm dev          # Vite dev server with HTTPS
 ```
+
+Open `https://localhost:5173/?dev=true` to enable the explicit developer bypass. In this mode, firmware can be mapped to a different OTA target, and Serial DFU skips the physical-target and second typed confirmations. The page displays a persistent warning because an incompatible image may require USB or SWD recovery.
 
 ### Deploy
 

@@ -3,10 +3,16 @@ export default {
   // ── App title ──────────────────────────────────────────
   title: 'SlimeNRF OTA Updater',
 
+  dev: {
+    title: 'Developer mode enabled',
+    warning: 'Board and role validation is disabled. Any loaded firmware can be mapped or flashed to any target.',
+  },
+
   // ── WebHID not supported ──────────────────────────────
   webhid: {
     notSupported: 'WebHID not supported',
     useChrome: 'Please use {chrome}, {edge}, or {opera} to access WebHID.',
+    serialAvailable: 'WebHID OTA is unavailable, but you can use Serial DFU below.',
   },
 
   // ── Connection card ────────────────────────────────────
@@ -94,6 +100,13 @@ export default {
     allMapped: 'All mapped',
     unmappedTargets: 'Unmapped targets',
     selectFirmware: '— Select firmware —',
+    targetExact: 'Firmware target matches the device target.',
+    developerBypass: 'Developer mode: target validation bypassed.',
+    targetUnknown: 'The filename does not identify a known target. Verify this firmware manually before flashing.',
+    modeChange: 'Known mode change: firmware target is {target}. Verify the hardware wiring and sensor bus mode.',
+    roleMismatch: 'Blocked: this is {role} firmware, not firmware for this device role.',
+    targetMismatch: 'Blocked: firmware target {target} does not match this device target.',
+    targetAmbiguous: 'Blocked: the filename matches more than one firmware role.',
   },
 
   // ── Update card ────────────────────────────────────────
@@ -116,6 +129,10 @@ export default {
     checkLog: 'Check the log for details. Failed trackers will reboot to bootloader.',
     scanAgain: 'Scan Again',
     dismiss: 'Dismiss',
+    confirmTitle: 'Confirm firmware targets',
+    confirmWarning: 'Review every device target and firmware file. Flashing the wrong target can make the device unusable until it is recovered over USB.',
+    cancel: 'Cancel',
+    confirmFlash: 'Targets are correct — flash',
   },
 
   // ── Serial DFU card ────────────────────────────────────
@@ -124,7 +141,7 @@ export default {
     usb: 'USB',
     description: 'Flash firmware directly via USB serial — device must be in DFU/bootloader mode (double-tap reset or {cmd} command)',
     webSerialNotSupported: 'Web Serial not supported',
-    webSerialRequires: 'Web Serial API requires Chrome 89+, Edge 89+, or Opera 76+.',
+    webSerialRequires: 'This browser does not provide the Web Serial API.',
     protocol: 'Protocol',
     autoDetect: 'Auto-detect',
     adafruit: 'Adafruit (Legacy)',
@@ -137,6 +154,27 @@ export default {
     abort: 'Abort',
     dfuComplete: 'DFU Complete!',
     dfuFailed: 'DFU Failed',
+    developerModeTitle: 'Developer mode: Serial target verification disabled',
+    developerModeDetail: 'The physical target and second typed confirmation will not be requested. The selected firmware will be sent to the chosen serial device.',
+    developerBypass: 'Developer mode: role and target checks bypassed.',
+    modelRequired: 'Serial DFU cannot verify the device model.',
+    modelRequiredDetail: 'Enter the exact target you physically verified on the device. This is the first confirmation; the bootloader does not report a trustworthy model.',
+    expectedTarget: 'Physically verified device target',
+    expectedTargetPlaceholder: 'for example: promicro_uf2/nrf52840/spi',
+    confirmTitle: 'Confirm Serial DFU target again',
+    selectRole: 'Role',
+    targetExact: 'Firmware role and target match this selection.',
+    targetUnknown: 'Filename target is unknown. Continue only after manually verifying the file.',
+    modeChange: 'Known mode change from firmware target {target}. Verify wiring and sensor bus mode.',
+    roleMismatch: 'Blocked: selected role does not match this {role} firmware.',
+    targetMismatch: 'Blocked: firmware target {target} does not match the entered target.',
+    targetAmbiguous: 'Blocked: filename matches more than one firmware role.',
+    confirmWarning: 'The selected serial port exposes only USB VID/PID and DFU protocol. It does not prove the board model. A wrong image can require USB/SWD recovery.',
+    firmware: 'Firmware',
+    firmwareTarget: 'Filename target',
+    unknownTarget: 'unknown — manually verify the file',
+    typeTargetAgain: 'Type {target} again to confirm the physical model is correct.',
+    confirmFlash: 'Model confirmed — flash',
     dfuLog: 'DFU Log',
   },
 
