@@ -14,6 +14,7 @@ import {
   refreshOnlineMaps,
 } from './boardmap.js';
 import { isDeveloperMode } from './dev-mode.js';
+import { requestConsoleDfu } from './console-dfu.js';
 import {
   fetchReleases, fetchCIRuns, fetchRunArtifacts,
   fetchReceiverCIRuns, fetchReceiverRunArtifacts,
@@ -1209,16 +1210,18 @@ Alpine.data('otaApp', () => ({
     }
   },
 
-  /** Send 'dfu' command via serial to make receiver enter DFU bootloader mode. */
+  /** Request DFU through a ready console, then observe entry or USB disconnect. */
   async enterReceiverDfu() {
+    if (this.enteringDfu) return;
     if (!('serial' in navigator)) {
       this.log('✗ Web Serial API not available');
       return;
     }
     this.enteringDfu = true;
-    let port = null;
+    const t = (key, params) => Alpine.store('i18n').t(key, params);
+    let selected = false;
     try {
-      port = await navigator.serial.requestPort({
+      const port = await navigator.serial.requestPort({
         filters: [
           { usbVendorId: 0x1209 }, // pid.codes (SlimeVR/Styria)
           { usbVendorId: 0x239A }, // Adafruit
@@ -1228,33 +1231,25 @@ Alpine.data('otaApp', () => ({
           { usbVendorId: 0x1B4F }, // SparkFun
         ],
       });
-      await port.open({ baudRate: 115200 });
-      this.log('Serial connected — sending DFU command…');
-
-      const encoder = new TextEncoder();
-      const writer = port.writable.getWriter();
-      await writer.write(encoder.encode('dfu\r\n'));
-      writer.releaseLock();
-
-      // Brief pause for the device to process the command before it resets
-      await new Promise(r => setTimeout(r, 500));
-
-      try { await port.close(); } catch {}
-      this.log('✓ DFU command sent — device is rebooting into bootloader mode');
-      this.log('Wait a moment, then use Serial DFU below to flash firmware');
+      selected = true;
+      this.log(t('receiver.dfuWaiting'));
+      const outcome = await requestConsoleDfu(port, navigator.serial, t, () => {
+        this.log(t('receiver.dfuReady'));
+      });
+      this.log(t(outcome === 'entered' ? 'receiver.dfuEntered' : 'receiver.dfuDisconnected'));
+      this.log(t('receiver.dfuNextStep'));
 
       // Scroll to Serial DFU section
       setTimeout(() => {
         document.getElementById('serial-dfu-section')?.scrollIntoView({ behavior: 'smooth' });
       }, 300);
     } catch (e) {
-      if (e.name === 'NotFoundError') {
+      if (!selected && e.name === 'NotFoundError') {
         // User cancelled the port picker
       } else {
-        this.log(`✗ DFU command error: ${e.message}`);
+        this.log(t('receiver.dfuError', { message: e.message }));
       }
     } finally {
-      try { if (port?.readable) await port.close(); } catch {}
       this.enteringDfu = false;
     }
   },
